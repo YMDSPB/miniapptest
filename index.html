@@ -9,71 +9,51 @@
   <style>
     :root{
       --bg:#0b0f1a; --card:rgba(255,255,255,.06); --border:rgba(255,255,255,.10);
-      --txt:#e8ecf3; --muted:#9aa3b2; --acc1:#5b8cff; --acc2:#8a7bff; --ok:#48e39a;
-      --shadow:0 24px 70px rgba(0,0,0,.45); --radius:18px;
+      --txt:#e8ecf3; --muted:#9aa3b2; --acc1:#5b8cff; --acc2:#8a7bff; --shadow:0 24px 70px rgba(0,0,0,.45); --radius:18px;
       --tfast:.25s cubic-bezier(.2,.7,.2,1); --tslow:.6s cubic-bezier(.2,.7,.2,1);
     }
-    *{box-sizing:border-box}
-    html,body{height:100%;margin:0}
+    *{box-sizing:border-box} html,body{height:100%;margin:0}
     body{font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;color:var(--txt);background:var(--bg);overflow:hidden}
-
-    .bg{position:fixed;inset:-10%;z-index:-2;will-change:transform,filter;filter:saturate(1.1);
-      background:
-        radial-gradient(1200px 900px at 10% 10%,#16213e 0%,transparent 55%),
-        radial-gradient(900px 800px at 90% 20%,#1a2b6d 0%,transparent 55%),
-        radial-gradient(900px 900px at 50% 100%,#261a53 0%,transparent 55%),
-        linear-gradient(180deg,#0b0f1a 0%,#0b0f1a 100%);
+    .bg{position:fixed;inset:-10%;z-index:-2;filter:saturate(1.1);
+      background:radial-gradient(1200px 900px at 10% 10%,#16213e 0%,transparent 55%),
+                 radial-gradient(900px 800px at 90% 20%,#1a2b6d 0%,transparent 55%),
+                 radial-gradient(900px 900px at 50% 100%,#261a53 0%,transparent 55%),
+                 linear-gradient(180deg,#0b0f1a 0%,#0b0f1a 100%);
       animation:bgfloat 16s ease-in-out infinite alternate}
-    @keyframes bgfloat{0%{filter:hue-rotate(0)}100%{filter:hue-rotate(18deg)}}
-
-    .screen{position:fixed;inset:0;display:grid;place-items:center;padding:20px;
-      opacity:0;transform:translateY(12px) scale(.985);pointer-events:none;
-      transition:opacity var(--tslow),transform var(--tslow);
-      overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior-y:contain;min-height:100svh}
+    @keyframes bgfloat{to{filter:hue-rotate(18deg)}}
+    .screen{position:fixed;inset:0;display:grid;place-items:center;padding:20px;opacity:0;transform:translateY(12px) scale(.985);
+      pointer-events:none;transition:opacity var(--tslow),transform var(--tslow);overflow-y:auto;min-height:100svh}
     .screen.active{opacity:1;transform:translateY(0) scale(1);pointer-events:auto}
-
-    .card{width:min(720px,92vw);background:var(--card);border:1px solid var(--border);
-      border-radius:var(--radius);padding:34px;box-shadow:var(--shadow);
-      backdrop-filter:blur(10px);display:grid;gap:18px;justify-items:center;text-align:center}
-
+    .card{width:min(720px,92vw);background:var(--card);border:1px solid var(--border);border-radius:var(--radius);
+      padding:34px;box-shadow:var(--shadow);backdrop-filter:blur(10px);display:grid;gap:18px;justify-items:center;text-align:center}
     .logo{display:flex;align-items:center;gap:12px}
     .logo-badge{width:56px;height:56px;border-radius:14px;background:conic-gradient(from 210deg,var(--acc1),var(--acc2));box-shadow:0 12px 30px rgba(91,140,255,.35);animation:spin 10s linear infinite}
     @keyframes spin{to{transform:rotate(1turn)}}
     .logo-title{font-weight:800;font-size:28px}
-
     .progress{width:100%;height:10px;border-radius:8px;background:rgba(255,255,255,.06);overflow:hidden}
-    .bar{height:100%;width:0%;background:linear-gradient(90deg,var(--acc1),var(--acc2));animation:loadbar 3.2s ease-out forwards}
-    @keyframes loadbar{0%{width:0}100%{width:100}}
-
+    .bar{height:100%;width:0%;background:linear-gradient(90deg,var(--acc1),var(--acc2));animation:loadbar 2.8s ease-out forwards}
+    @keyframes loadbar{to{width:100%}}
     .cta{border:0;cursor:pointer;padding:15px 22px;border-radius:14px;color:#fff;font-weight:700;font-size:16px;
-      background:linear-gradient(180deg,#6ea8ff,#2a74ff);box-shadow:0 16px 40px rgba(46,116,255,.35);
-      transition:transform var(--tfast),filter var(--tfast)} 
-    .cta:hover{filter:brightness(1.06)} .cta:active{transform:translateY(1px) scale(.99)}
-    .cta.pulse{animation:pulse 1.6s ease-in-out infinite}
-    @keyframes pulse{0%,100%{box-shadow:0 16px 40px rgba(46,116,255,.35)}50%{box-shadow:0 22px 55px rgba(46,116,255,.55)}}
-
+      background:linear-gradient(180deg,#6ea8ff,#2a74ff);box-shadow:0 16px 40px rgba(46,116,255,.35);transition:transform var(--tfast),filter var(--tfast)}
+    .cta:hover{filter:brightness(1.06)} .cta:active{transform:translateY(1px) scale(.99)} .cta.pulse{animation:pulse 1.6s ease-in-out infinite}
+    @keyframes pulse{50%{box-shadow:0 22px 55px rgba(46,116,255,.55)}}
     .library .wrap{width:min(1100px,94vw);margin:auto;display:grid;gap:16px;grid-template-rows:auto 1fr;padding:8px 0 40px}
     .lib-head{display:flex;justify-content:space-between;align-items:flex-end;gap:12px;flex-wrap:wrap;padding:12px 6px}
     .grid{display:grid;gap:16px;grid-template-columns:repeat(auto-fit,minmax(220px,1fr))}
     .tile{position:relative;border-radius:16px;background:var(--card);border:1px solid var(--border);padding:16px 14px;min-height:92px;
-      backdrop-filter:blur(8px);box-shadow:0 10px 30px rgba(0,0,0,.25);cursor:pointer;
-      opacity:0;transform:translateY(14px) scale(.98);will-change:transform,opacity;transition:transform var(--tfast),border-color var(--tfast),background var(--tfast)}
-    .tile:hover{transform:translateY(-4px) scale(1);border-color:rgba(110,168,254,.45);background:rgba(255,255,255,.08)}
-    .tile.in{opacity:1;transform:translateY(0) scale(1)}
-    .tile h3{margin:0 0 6px 0;font-size:17px} .tile p{margin:0;color:var(--muted);font-size:13px}
-    .chip{position:absolute;top:10px;right:10px;padding:6px 10px;border-radius:999px;font-size:12px;font-weight:700;background:linear-gradient(90deg,#3dc3a3,#45e39a);color:#0b1b16}
+      backdrop-filter:blur(8px);box-shadow:0 10px 30px rgba(0,0,0,.25);cursor:pointer;opacity:0;transform:translateY(14px) scale(.98);
+      transition:transform var(--tfast),border-color var(--tfast),background var(--tfast)}
+    .tile:hover{transform:translateY(-4px) scale(1);border-color:rgba(110,168,254,.45);background:rgba(255,255,255,.08)} .tile.in{opacity:1;transform:translateY(0) scale(1)}
+    .tile h3{margin:0 0 6px 0;font-size:17px} .tile p{margin:0;color:var(--muted);font-size:13px} .chip{position:absolute;top:10px;right:10px;padding:6px 10px;border-radius:999px;font-size:12px;font-weight:700;background:linear-gradient(90deg,#3dc3a3,#45e39a);color:#0b1b16}
     .hint{color:var(--muted);font-size:12px}
-
-    /* — модалка логина — */
     #loginModal{position:fixed;inset:0;display:none;place-items:center;background:rgba(0,0,0,.45);z-index:1000}
     #loginModal .inner{width:min(520px,92vw);background:rgba(20,24,38,.95);border:1px solid rgba(255,255,255,.1);border-radius:16px;padding:18px;backdrop-filter:blur(8px)}
     input{font:inherit;width:100%;padding:10px;border-radius:10px;border:1px solid rgba(255,255,255,.15);background:rgba(0,0,0,.25);color:#fff}
   </style>
 </head>
 <body>
-  <div class="bg" id="bg"></div>
+  <div class="bg"></div>
 
-  <!-- SPLASH -->
   <section id="splash" class="screen active">
     <div class="card">
       <div class="logo"><div class="logo-badge"></div><div class="logo-title">Student+ MiniApp</div></div>
@@ -82,16 +62,14 @@
     </div>
   </section>
 
-  <!-- CONNECT -->
   <section id="connect" class="screen">
     <div class="card">
       <h1 style="margin:6px 0 2px">Подключить ЛМС</h1>
-      <p class="hint" style="margin:0 0 6px">Авторизуем через HSE SSO</p>
+      <p class="hint" style="margin:0 0 6px">Авторизация через HSE SSO</p>
       <button id="btnConnect" class="cta pulse">Подключить</button>
     </div>
   </section>
 
-  <!-- LIBRARY -->
   <section id="library" class="screen library">
     <div class="wrap">
       <div class="lib-head">
@@ -101,7 +79,7 @@
     </div>
   </section>
 
-  <!-- Модалка логина/пароля -->
+  <!-- модалка логина -->
   <div id="loginModal">
     <div class="inner">
       <h3 style="margin:0 0 10px 0">Вход в ЛМС (HSE SSO)</h3>
@@ -113,13 +91,13 @@
         <button id="btnSubmitCreds" class="cta">Войти</button>
         <button id="btnCancelCreds" class="cta" style="background:linear-gradient(180deg,#666,#444)">Отмена</button>
       </div>
-      <div class="hint" style="margin-top:8px">Откроем браузер и выполним вход, окно останется открытым.</div>
+      <div class="hint" style="margin-top:8px">Откроется Chrome, нажмёт «Войти», заполнит форму медленно и оставит окно открытым.</div>
     </div>
   </div>
 
   <script>
     const tg = window.Telegram?.WebApp; try{ tg?.expand(); }catch{}
-    const AUTH_URL = "https://saml.hse.ru/realms/hse/protocol/openid-connect/auth?response_type=code&client_id=smart-lms-edu&scope=openid%20profile%20email&nonce=N68f2a6375e13a&response_mode=form_post&state=ZjHGGDEnptBVoOZ&redirect_uri=https%3A%2F%2Fedu.hse.ru%2Fauth%2Foidckc%2F&resource=https%3A%2F%2Fsaml.hse.ru";
+    const AUTH_START_URL = "https://edu.hse.ru/login/hselogin.php";
 
     const splash = document.getElementById('splash');
     const connect = document.getElementById('connect');
@@ -148,29 +126,20 @@
     ];
 
     function show(el){ [splash,connect,library].forEach(e=>e.classList.remove('active')); el.classList.add('active'); }
+    setTimeout(()=>show(connect), 2800);
 
-    // splash -> connect
-    setTimeout(()=>show(connect), 3200);
-
-    // Нажатие "Подключить" — спрашиваем логин/пароль, затем отправляем в бота
-    btnConnect.addEventListener('click', ()=>{
-      loginModal.style.display='grid';
-      loginInput.focus();
-    });
-
+    btnConnect.addEventListener('click', ()=>{ loginModal.style.display='grid'; loginInput.focus(); });
     btnCancelCreds.addEventListener('click', ()=> loginModal.style.display='none');
 
     btnSubmitCreds.addEventListener('click', ()=>{
       const login = (loginInput.value||"").trim();
       const password = (passInput.value||"").trim();
       if(!login || !password){ alert("Введи логин и пароль"); return; }
-
-      const payload = { kind:"login_hse", login, password, auth_url: AUTH_URL };
+      const payload = { kind:"login_hse_slow", login, password, start_url: AUTH_START_URL };
       try{
         tg?.sendData(JSON.stringify(payload));
         tg?.HapticFeedback?.impactOccurred('medium');
         loginModal.style.display='none';
-        // Переходим в библиотеку для UX, логин выполняется ботом в отдельном браузере
         renderLibrary(); show(library);
       }catch(e){
         alert("Не удалось отправить в бота: " + e);
