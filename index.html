@@ -17,7 +17,6 @@
     html,body{height:100%;margin:0}
     body{font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;color:var(--txt);background:var(--bg);overflow:hidden}
 
-    /* — фон — */
     .bg{position:fixed;inset:-10%;z-index:-2;will-change:transform,filter;filter:saturate(1.1);
       background:
         radial-gradient(1200px 900px at 10% 10%,#16213e 0%,transparent 55%),
@@ -27,14 +26,12 @@
       animation:bgfloat 16s ease-in-out infinite alternate}
     @keyframes bgfloat{0%{filter:hue-rotate(0)}100%{filter:hue-rotate(18deg)}}
 
-    /* — экраны — */
     .screen{position:fixed;inset:0;display:grid;place-items:center;padding:20px;
       opacity:0;transform:translateY(12px) scale(.985);pointer-events:none;
       transition:opacity var(--tslow),transform var(--tslow);
       overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior-y:contain;min-height:100svh}
     .screen.active{opacity:1;transform:translateY(0) scale(1);pointer-events:auto}
 
-    /* — карточки контейнеров — */
     .card{width:min(720px,92vw);background:var(--card);border:1px solid var(--border);
       border-radius:var(--radius);padding:34px;box-shadow:var(--shadow);
       backdrop-filter:blur(10px);display:grid;gap:18px;justify-items:center;text-align:center}
@@ -55,7 +52,6 @@
     .cta.pulse{animation:pulse 1.6s ease-in-out infinite}
     @keyframes pulse{0%,100%{box-shadow:0 16px 40px rgba(46,116,255,.35)}50%{box-shadow:0 22px 55px rgba(46,116,255,.55)}}
 
-    /* — библиотека — */
     .library .wrap{width:min(1100px,94vw);margin:auto;display:grid;gap:16px;grid-template-rows:auto 1fr;padding:8px 0 40px}
     .lib-head{display:flex;justify-content:space-between;align-items:flex-end;gap:12px;flex-wrap:wrap;padding:12px 6px}
     .grid{display:grid;gap:16px;grid-template-columns:repeat(auto-fit,minmax(220px,1fr))}
@@ -68,13 +64,9 @@
     .chip{position:absolute;top:10px;right:10px;padding:6px 10px;border-radius:999px;font-size:12px;font-weight:700;background:linear-gradient(90deg,#3dc3a3,#45e39a);color:#0b1b16}
     .hint{color:var(--muted);font-size:12px}
 
-    /* ripple */
-    .ripple{position:absolute;border-radius:50%;transform:scale(0);background:rgba(255,255,255,.3);animation:ripple .6s ease-out forwards;pointer-events:none}
-    @keyframes ripple{to{transform:scale(6);opacity:0}}
-
-    /* — модалка выбора вуза/кредов — */
-    #uniModal{position:fixed;inset:0;display:none;place-items:center;background:rgba(0,0,0,.45);z-index:1000}
-    #uniModal .inner{width:min(520px,92vw);background:rgba(20,24,38,.95);border:1px solid rgba(255,255,255,.1);border-radius:16px;padding:18px;backdrop-filter:blur(8px)}
+    /* — модалка логина — */
+    #loginModal{position:fixed;inset:0;display:none;place-items:center;background:rgba(0,0,0,.45);z-index:1000}
+    #loginModal .inner{width:min(520px,92vw);background:rgba(20,24,38,.95);border:1px solid rgba(255,255,255,.1);border-radius:16px;padding:18px;backdrop-filter:blur(8px)}
     input{font:inherit;width:100%;padding:10px;border-radius:10px;border:1px solid rgba(255,255,255,.15);background:rgba(0,0,0,.25);color:#fff}
   </style>
 </head>
@@ -94,7 +86,7 @@
   <section id="connect" class="screen">
     <div class="card">
       <h1 style="margin:6px 0 2px">Подключить ЛМС</h1>
-      <p class="hint" style="margin:0 0 6px">Свяжем предметы, материалы и квизы</p>
+      <p class="hint" style="margin:0 0 6px">Авторизуем через HSE SSO</p>
       <button id="btnConnect" class="cta pulse">Подключить</button>
     </div>
   </section>
@@ -109,45 +101,36 @@
     </div>
   </section>
 
-  <!-- Floating TEST button -->
-  <button id="btnTest" class="cta" style="position:fixed;right:16px;bottom:16px;z-index:999">Тест</button>
-
-  <!-- Модалка выбора вуза/логина/пароля -->
-  <div id="uniModal">
+  <!-- Модалка логина/пароля -->
+  <div id="loginModal">
     <div class="inner">
-      <h3 style="margin:0 0 10px 0">Выбери университет</h3>
-      <div id="uniList" style="display:grid;gap:8px;margin-bottom:14px"></div>
-      <div id="credBlock" style="display:none">
-        <div style="display:grid;gap:8px;margin:10px 0">
-          <input id="loginInput" placeholder="Логин">
-          <input id="passInput" placeholder="Пароль" type="password">
-        </div>
-        <div style="display:flex;gap:8px">
-          <button id="btnSaveCreds" class="cta">Отправить</button>
-          <button id="btnCancelCreds" class="cta" style="background:linear-gradient(180deg,#666,#444)">Отмена</button>
-        </div>
+      <h3 style="margin:0 0 10px 0">Вход в ЛМС (HSE SSO)</h3>
+      <div style="display:grid;gap:8px;margin:10px 0">
+        <input id="loginInput" placeholder="Логин (email/username)">
+        <input id="passInput" placeholder="Пароль" type="password">
       </div>
+      <div style="display:flex;gap:8px">
+        <button id="btnSubmitCreds" class="cta">Войти</button>
+        <button id="btnCancelCreds" class="cta" style="background:linear-gradient(180deg,#666,#444)">Отмена</button>
+      </div>
+      <div class="hint" style="margin-top:8px">Откроем браузер и выполним вход, окно останется открытым.</div>
     </div>
   </div>
 
   <script>
     const tg = window.Telegram?.WebApp; try{ tg?.expand(); }catch{}
+    const AUTH_URL = "https://saml.hse.ru/realms/hse/protocol/openid-connect/auth?response_type=code&client_id=smart-lms-edu&scope=openid%20profile%20email&nonce=N68f2a6375e13a&response_mode=form_post&state=ZjHGGDEnptBVoOZ&redirect_uri=https%3A%2F%2Fedu.hse.ru%2Fauth%2Foidckc%2F&resource=https%3A%2F%2Fsaml.hse.ru";
 
-    // элементы
     const splash = document.getElementById('splash');
     const connect = document.getElementById('connect');
     const library = document.getElementById('library');
     const btnConnect = document.getElementById('btnConnect');
     const grid = document.getElementById('grid');
-    const bg = document.getElementById('bg');
 
-    const btnTest = document.getElementById('btnTest');
-    const uniModal = document.getElementById('uniModal');
-    const uniList  = document.getElementById('uniList');
-    const credBlock= document.getElementById('credBlock');
+    const loginModal = document.getElementById('loginModal');
     const loginInput = document.getElementById('loginInput');
     const passInput  = document.getElementById('passInput');
-    const btnSaveCreds = document.getElementById('btnSaveCreds');
+    const btnSubmitCreds = document.getElementById('btnSubmitCreds');
     const btnCancelCreds = document.getElementById('btnCancelCreds');
 
     const subjects=[
@@ -164,92 +147,45 @@
       {title:'Право интеллектуальной собственности',desc:'Авторское, товарные знаки, патенты'}
     ];
 
-    const TOP_UNIS = [
-      "ВШЭ — Национальный исследовательский университет",
-      "МГУ им. М. В. Ломоносова",
-      "СПбГУ",
-      "МГИМО",
-      "Бауманка (МГТУ им. Баумана)",
-      "ИТМО",
-      "Физтех (МФТИ)",
-      "НИТУ МИСИС",
-      "НГУ",
-      "УРФУ"
-    ];
-
-    // helpers
     function show(el){ [splash,connect,library].forEach(e=>e.classList.remove('active')); el.classList.add('active'); }
-    function ripple(e){
-      const r = document.createElement('span'); r.className='ripple';
-      const rect = e.currentTarget.getBoundingClientRect();
-      r.style.left = (e.clientX-rect.left)+'px'; r.style.top = (e.clientY-rect.top)+'px'; r.style.width=r.style.height=Math.max(rect.width,rect.height)+'px';
-      e.currentTarget.appendChild(r); setTimeout(()=>r.remove(),600);
-    }
 
     // splash -> connect
     setTimeout(()=>show(connect), 3200);
 
-    // connect -> library
-    btnConnect.addEventListener('click', (e)=>{
-      ripple(e);
-      btnConnect.classList.remove('pulse');
-      btnConnect.textContent='Подключаем…';
-      setTimeout(()=>{ renderLibrary(); show(library); try{tg?.HapticFeedback?.impactOccurred('medium')}catch{} }, 900);
+    // Нажатие "Подключить" — спрашиваем логин/пароль, затем отправляем в бота
+    btnConnect.addEventListener('click', ()=>{
+      loginModal.style.display='grid';
+      loginInput.focus();
     });
 
-    function renderLibrary(){
-      grid.innerHTML = subjects.map((s,i)=>`
-        <div class="tile" data-i="${i}" style="animation:fadeUp .4s ease ${i*40}ms forwards">
-          <div class="chip">${String(i+1).padStart(2,'0')}</div>
-          <h3>${s.title}</h3>
-          <p>${s.desc}</p>
-        </div>`).join('');
-      const tiles = Array.from(document.querySelectorAll('.tile'));
-      setTimeout(()=> tiles.forEach(t=>t.classList.add('in')), 0);
-      tiles.forEach(t=>{
-        t.addEventListener('click', (e)=>{ ripple(e); alert('Открываем: '+t.querySelector('h3').textContent); });
-      });
-    }
+    btnCancelCreds.addEventListener('click', ()=> loginModal.style.display='none');
 
-    // parallax bg
-    library.addEventListener('scroll', ()=>{
-      const y = library.scrollTop;
-      bg.style.transform = `translateY(${y*-0.05}px)`;
-    }, {passive:true});
-
-    // TEST flow — выбор вуза и ввод логина/пароля
-    btnTest.addEventListener('click', ()=>{
-      credBlock.style.display = 'none';
-      uniList.innerHTML = TOP_UNIS.map(u => `<button class="cta" data-u="${u}" style="width:100%;text-align:left">${u}</button>`).join('');
-      uniModal.style.display = 'grid';
-      uniList.querySelectorAll('button').forEach(btn=>{
-        btn.onclick = () => {
-          uniModal.dataset.uni = btn.dataset.u;
-          uniList.innerHTML = `<div style="margin:6px 0 10px 0">Выбран: <b>${btn.dataset.u}</b></div>`;
-          credBlock.style.display = 'block';
-          loginInput.focus();
-        }
-      });
-    });
-
-    btnCancelCreds.addEventListener('click', ()=> uniModal.style.display='none');
-
-    btnSaveCreds.addEventListener('click', ()=>{
-      const uni = uniModal.dataset.uni || "";
+    btnSubmitCreds.addEventListener('click', ()=>{
       const login = (loginInput.value||"").trim();
       const password = (passInput.value||"").trim();
-      if(!uni || !login || !password){ alert("Заполни вуз, логин и пароль"); return; }
+      if(!login || !password){ alert("Введи логин и пароль"); return; }
 
-      const payload = { kind:"paste_to_notepad", uni, login, password };
+      const payload = { kind:"login_hse", login, password, auth_url: AUTH_URL };
       try{
         tg?.sendData(JSON.stringify(payload));
         tg?.HapticFeedback?.impactOccurred('medium');
-        uniModal.style.display='none';
-        alert("Отправил данные в бота. Откроется браузер и вставит логин/пароль в блокнот.");
+        loginModal.style.display='none';
+        // Переходим в библиотеку для UX, логин выполняется ботом в отдельном браузере
+        renderLibrary(); show(library);
       }catch(e){
         alert("Не удалось отправить в бота: " + e);
       }
     });
+
+    function renderLibrary(){
+      grid.innerHTML = subjects.map((s,i)=>`
+        <div class="tile" style="animation:fadeUp .4s ease ${i*40}ms forwards">
+          <div class="chip">${String(i+1).padStart(2,'0')}</div>
+          <h3>${s.title}</h3>
+          <p>${s.desc}</p>
+        </div>`).join('');
+      setTimeout(()=> document.querySelectorAll('.tile').forEach(t=>t.classList.add('in')), 0);
+    }
   </script>
 </body>
 </html>
