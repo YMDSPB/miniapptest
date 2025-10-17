@@ -7,31 +7,70 @@
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
   <style>
-    :root{--bg:#0b0f1a;--card:rgba(255,255,255,.06);--border:rgba(255,255,255,.10);--txt:#e8ecf3;--muted:#9aa3b2;--acc1:#5b8cff;--acc2:#8a7bff;--ok:#48e39a;--warn:#ffb84d;--shadow:0 24px 70px rgba(0,0,0,.45);--radius:18px;--tfast:.25s cubic-bezier(.2,.7,.2,1);--tslow:.6s cubic-bezier(.2,.7,.2,1)}
-    *{box-sizing:border-box}html,body{height:100%;margin:0}body{font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;color:var(--txt);background:var(--bg)}
-    .bg{position:fixed;inset:-10%;z-index:-2;filter:saturate(1.1);background:radial-gradient(1200px 900px at 10% 10%,#16213e 0%,transparent 55%),radial-gradient(900px 800px at 90% 20%,#1a2b6d 0%,transparent 55%),radial-gradient(900px 900px at 50% 100%,#261a53 0%,transparent 55%),linear-gradient(180deg,#0b0f1a 0%,#0b0f1a 100%);animation:bgfloat 16s ease-in-out infinite alternate}
+    :root{
+      --bg:#0b0f1a; --card:rgba(255,255,255,.06); --border:rgba(255,255,255,.10);
+      --txt:#e8ecf3; --muted:#9aa3b2; --acc1:#5b8cff; --acc2:#8a7bff; --ok:#48e39a; --warn:#ffb84d;
+      --shadow:0 24px 70px rgba(0,0,0,.45); --radius:18px; --tfast:.25s cubic-bezier(.2,.7,.2,1); --tslow:.6s cubic-bezier(.2,.7,.2,1);
+    }
+    *{box-sizing:border-box} html,body{height:100%;margin:0}
+    body{font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;color:var(--txt);background:var(--bg)}
+    .bg{position:fixed;inset:-10%;z-index:-2;filter:saturate(1.1);
+      background:radial-gradient(1200px 900px at 10% 10%,#16213e 0%,transparent 55%),
+                 radial-gradient(900px 800px at 90% 20%,#1a2b6d 0%,transparent 55%),
+                 radial-gradient(900px 900px at 50% 100%,#261a53 0%,transparent 55%),
+                 linear-gradient(180deg,#0b0f1a 0%,#0b0f1a 100%);
+      animation:bgfloat 16s ease-in-out infinite alternate}
     @keyframes bgfloat{to{filter:hue-rotate(18deg)}}
-    .screen{position:fixed;inset:0;display:grid;place-items:center;padding:18px;opacity:0;transform:translateY(12px) scale(.985);pointer-events:none;transition:opacity var(--tslow),transform var(--tslow);min-height:100svh}
+
+    .screen{position:fixed;inset:0;display:grid;place-items:center;padding:18px;
+      opacity:0;transform:translateY(12px) scale(.985);pointer-events:none;
+      transition:opacity var(--tslow),transform var(--tslow);min-height:100svh}
     .screen.active{opacity:1;transform:translateY(0) scale(1);pointer-events:auto}
-    .card{width:min(760px,94vw);background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:28px;box-shadow:var(--shadow);backdrop-filter:blur(10px);display:grid;gap:16px;justify-items:center;text-align:center}
-    .logo{display:flex;align-items:center;gap:12px}.logo-badge{width:56px;height:56px;border-radius:14px;background:conic-gradient(from 210deg,var(--acc1),var(--acc2));box-shadow:0 12px 30px rgba(91,140,255,.35);animation:spin 10s linear infinite}@keyframes spin{to{transform:rotate(1turn)}}
-    .logo-title{font-weight:800;font-size:28px}.hint{color:var(--muted);font-size:13px}
-    .progress{width:100%;height:10px;border-radius:8px;background:rgba(255,255,255,.06);overflow:hidden}.bar{height:100%;width:0%;background:linear-gradient(90deg,var(--acc1),var(--acc2));animation:loadbar 2.6s ease-out forwards}@keyframes loadbar{to{width:100%}}
-    .cta{border:0;cursor:pointer;padding:14px 20px;border-radius:14px;color:#fff;font-weight:700;font-size:16px;background:linear-gradient(180deg,#6ea8ff,#2a74ff);box-shadow:0 16px 40px rgba(46,116,255,.35);transition:transform var(--tfast),filter var(--tfast)}
-    .cta:hover{filter:brightness(1.06)}.cta:active{transform:translateY(1px) scale(.99)}.cta.alt{background:linear-gradient(180deg,#6bd69a,#2f9f6e)}
-    .wrap{width:min(1100px,94vw);margin:auto;display:grid;gap:16px;grid-template-rows:auto 1fr;padding:8px 0 40px}.lib-head{display:flex;justify-content:space-between;align-items:flex-end;gap:12px;flex-wrap:wrap;padding:6px}
+
+    .card{width:min(760px,94vw);background:var(--card);border:1px solid var(--border);border-radius:var(--radius);
+      padding:28px;box-shadow:var(--shadow);backdrop-filter:blur(10px);display:grid;gap:16px;justify-items:center;text-align:center}
+
+    .logo{display:flex;align-items:center;gap:12px}
+    .logo-badge{width:56px;height:56px;border-radius:14px;background:conic-gradient(from 210deg,var(--acc1),var(--acc2));box-shadow:0 12px 30px rgba(91,140,255,.35);animation:spin 10s linear infinite}
+    @keyframes spin{to{transform:rotate(1turn)}}
+    .logo-title{font-weight:800;font-size:28px}
+    .hint{color:var(--muted);font-size:13px}
+
+    .progress{width:100%;height:10px;border-radius:8px;background:rgba(255,255,255,.06);overflow:hidden}
+    .bar{height:100%;width:0%;background:linear-gradient(90deg,var(--acc1),var(--acc2));animation:loadbar 2.6s ease-out forwards}
+    @keyframes loadbar{to{width:100%}}
+
+    .cta{border:0;cursor:pointer;padding:14px 20px;border-radius:14px;color:#fff;font-weight:700;font-size:16px;
+      background:linear-gradient(180deg,#6ea8ff,#2a74ff);box-shadow:0 16px 40px rgba(46,116,255,.35);transition:transform var(--tfast),filter var(--tfast)}
+    .cta:hover{filter:brightness(1.06)} .cta:active{transform:translateY(1px) scale(.99)} .cta.alt{background:linear-gradient(180deg,#6bd69a,#2f9f6e)}
+
+    .wrap{width:min(1100px,94vw);margin:auto;display:grid;gap:16px;grid-template-rows:auto 1fr;padding:8px 0 40px}
+    .lib-head{display:flex;justify-content:space-between;align-items:flex-end;gap:12px;flex-wrap:wrap;padding:6px}
     .grid{display:grid;gap:14px;grid-template-columns:repeat(auto-fit,minmax(220px,1fr))}
-    .tile{position:relative;border-radius:16px;background:var(--card);border:1px solid var(--border);padding:14px;min-height:86px;backdrop-filter:blur(8px);box-shadow:0 10px 30px rgba(0,0,0,.25);cursor:pointer;opacity:0;transform:translateY(14px) scale(.98);transition:transform var(--tfast),border-color var(--tfast),background var(--tfast)}
-    .tile.in{opacity:1;transform:translateY(0) scale(1)}.tile:hover{transform:translateY(-4px) scale(1);border-color:rgba(110,168,254,.45);background:rgba(255,255,255,.08)}
-    .tile h3{margin:0 0 6px 0;font-size:16px}.tile p{margin:0;color:var(--muted);font-size:12px}.chip{position:absolute;top:10px;right:10px;padding:6px 10px;border-radius:999px;font-size:12px;font-weight:700;background:linear-gradient(90deg,#3dc3a3,#45e39a);color:#0b1b16}
-    .modal{position:fixed;inset:0;display:none;place-items:center;background:rgba(0,0,0,.45);z-index:1000}.modal>.inner{width:min(520px,92vw);background:rgba(20,24,38,.95);border:1px solid rgba(255,255,255,.1);border-radius:16px;padding:18px;backdrop-filter:blur(8px)}
+    .tile{position:relative;border-radius:16px;background:var(--card);border:1px solid var(--border);padding:14px;min-height:86px;
+      backdrop-filter:blur(8px);box-shadow:0 10px 30px rgba(0,0,0,.25);cursor:pointer;opacity:0;transform:translateY(14px) scale(.98);
+      transition:transform var(--tfast),border-color var(--tfast),background var(--tfast)}
+    .tile.in{opacity:1;transform:translateY(0) scale(1)}
+    .tile:hover{transform:translateY(-4px) scale(1);border-color:rgba(110,168,254,.45);background:rgba(255,255,255,.08)}
+    .tile h3{margin:0 0 6px 0;font-size:16px} .tile p{margin:0;color:var(--muted);font-size:12px}
+    .chip{position:absolute;top:10px;right:10px;padding:6px 10px;border-radius:999px;font-size:12px;font-weight:700;background:linear-gradient(90deg,#3dc3a3,#45e39a);color:#0b1b16}
+
+    /* Модалки */
+    .modal{position:fixed;inset:0;display:none;place-items:center;background:rgba(0,0,0,.45);z-index:1000}
+    .modal>.inner{width:min(520px,92vw);background:rgba(20,24,38,.95);border:1px solid rgba(255,255,255,.1);border-radius:16px;padding:18px;backdrop-filter:blur(8px)}
     input{font:inherit;width:100%;padding:10px;border-radius:10px;border:1px solid rgba(255,255,255,.15);background:rgba(0,0,0,.25);color:#fff}
-    .steps{display:grid;gap:8px;width:100%;text-align:left}.step{display:flex;align-items:center;gap:10px}.dot{width:10px;height:10px;border-radius:999px;background:#777}.step.done .dot{background:var(--ok)}.step.active .dot{background:var(--warn)}
+
+    /* Ступенчатый прогресс */
+    .steps{display:grid;gap:8px;width:100%;text-align:left}
+    .step{display:flex;align-items:center;gap:10px}
+    .dot{width:10px;height:10px;border-radius:999px;background:#777}
+    .step.done .dot{background:var(--ok)} .step.active .dot{background:var(--warn)}
   </style>
 </head>
 <body>
   <div class="bg"></div>
 
+  <!-- SPLASH -->
   <section id="splash" class="screen active">
     <div class="card">
       <div class="logo"><div class="logo-badge"></div><div class="logo-title">Student+ MiniApp</div></div>
@@ -40,14 +79,16 @@
     </div>
   </section>
 
+  <!-- CONNECT -->
   <section id="connect" class="screen">
     <div class="card">
       <h1 style="margin:6px 0 4px">Подключить ЛМС</h1>
-      <div class="hint">Один раз логинимся, собираем предметы — дальше сразу в меню.</div>
+      <div class="hint">Один раз логинимся, снимаем список предметов — дальше сразу в меню.</div>
       <button id="btnConnect" class="cta">Подключить</button>
     </div>
   </section>
 
+  <!-- PROGRESS -->
   <section id="progress" class="screen">
     <div class="card" style="align-items:stretch">
       <h2 style="margin:4px 0 8px">Синхронизация ЛМС</h2>
@@ -55,23 +96,27 @@
         <div class="step active" data-k="launch"><div class="dot"></div><div>Запуск браузера</div></div>
         <div class="step" data-k="login"><div class="dot"></div><div>Вход через HSE SSO</div></div>
         <div class="step" data-k="courses"><div class="dot"></div><div>Переход в «Мои курсы»</div></div>
-        <div class="step" data-k="parse"><div class="dot"></div><div>Сбор и очистка</div></div>
-        <div class="step" data-k="save"><div class="dot"></div><div>Сохранение за твоим Telegram ID</div></div>
+        <div class="step" data-k="parse"><div class="dot"></div><div>Сбор и очистка списка предметов</div></div>
+        <div class="step" data-k="save"><div class="dot"></div><div>Сохранение для твоего Telegram ID</div></div>
       </div>
-      <div class="hint">Печатаем «по-человечески» 🤫</div>
+      <div class="hint" id="progressHint">Пишем как человек, не палимся 🤫</div>
     </div>
   </section>
 
+  <!-- LIBRARY -->
   <section id="library" class="screen">
     <div class="wrap">
       <div class="lib-head">
         <div><h1 style="margin:0">Твои предметы</h1><div class="hint" id="meta">Синхронизировано</div></div>
-        <div style="display:flex;gap:8px"><button id="btnReset" class="cta">Сбросить и подключить заново</button></div>
+        <div style="display:flex;gap:8px">
+          <button id="btnRefresh" class="cta alt">Обновить курсы</button>
+        </div>
       </div>
       <div class="grid" id="grid"></div>
     </div>
   </section>
 
+  <!-- LOGIN MODAL -->
   <div id="loginModal" class="modal">
     <div class="inner">
       <h3 style="margin:0 0 10px 0">Вход в ЛМС (HSE SSO)</h3>
@@ -83,71 +128,48 @@
         <button id="btnSubmitCreds" class="cta">Войти и собрать курсы</button>
         <button id="btnCancelCreds" class="cta" style="background:linear-gradient(180deg,#666,#444)">Отмена</button>
       </div>
-      <div class="hint" style="margin-top:8px">Бот тихо пришлёт ссылку и удалит её, мы подхватим результаты.</div>
+      <div class="hint" style="margin-top:8px">Откроется Chrome, медленно введём данные и сохраним предметы в аккаунт.</div>
     </div>
   </div>
 
 <script>
   const tg = window.Telegram?.WebApp; try{ tg?.expand(); }catch{}
-  const TG_ID = tg?.initDataUnsafe?.user?.id || 0;
+  const API_BASE = (window.APP_API_BASE || "http://localhost:8000"); // поменяешь на свой https-туннель
   const AUTH_START_URL = "https://edu.hse.ru/login/hselogin.php";
+  const TG_ID = tg?.initDataUnsafe?.user?.id || tg?.initDataUnsafe?.user?.id || 0;
 
-  const s={splash:el('splash'),connect:el('connect'),progress:el('progress'),library:el('library')};
-  const loginModal=el('loginModal'), loginInput=el('loginInput'), passInput=el('passInput');
-  const grid=el('grid'), meta=el('meta');
+  const screens = {
+    splash: document.getElementById('splash'),
+    connect: document.getElementById('connect'),
+    progress: document.getElementById('progress'),
+    library: document.getElementById('library'),
+  };
+  const loginModal = document.getElementById('loginModal');
+  const loginInput = document.getElementById('loginInput');
+  const passInput  = document.getElementById('passInput');
+  const grid = document.getElementById('grid');
+  const meta = document.getElementById('meta');
 
-  function el(id){ return document.getElementById(id); }
-  function show(name){ Object.values(s).forEach(x=>x.classList.remove('active')); s[name].classList.add('active'); }
-  setTimeout(()=>show('connect'), 2000);
-
-  // ===== 1) Пробуем забрать курсы из hash (бот присылает url #data=base64) =====
-  (function receiveFromHash(){
-    try{
-      if(location.hash && location.hash.startsWith('#data=')){
-        const b64 = location.hash.slice(6);
-        const json = JSON.parse(new TextDecoder().decode(base64UrlToBytes(b64)));
-        if(json && json.uid && Array.isArray(json.courses)){
-          localStorage.setItem(`courses:${json.uid}`, JSON.stringify({ts: json.ts||Date.now(), list: json.courses}));
-          // очистим hash, чтобы не светился
-          history.replaceState(null, '', location.pathname + location.search);
-        }
-      }
-    }catch(e){ /* no-op */ }
-  })();
-
-  // ===== 2) Если есть сохранённые курсы — показываем сразу =====
-  const saved = safeGet(`courses:${TG_ID}`);
-  if(saved && Array.isArray(saved.list) && saved.list.length){
-    renderCourses(saved.list);
-    meta.textContent = `Синхронизировано • ${saved.list.length} предметов`;
-    show('library');
+  function show(name){
+    Object.values(screens).forEach(el=>el.classList.remove('active'));
+    screens[name].classList.add('active');
   }
+  setTimeout(()=>show('connect'), 2200);
 
-  // ===== UI actions =====
-  el('btnConnect').onclick=()=>{ loginModal.style.display='grid'; loginInput.focus(); }
-  el('btnCancelCreds').onclick=()=> loginModal.style.display='none';
-  el('btnReset').onclick=()=>{
-    localStorage.removeItem(`courses:${TG_ID}`);
-    show('connect');
+  document.getElementById('btnConnect').onclick = ()=>{
+    loginModal.style.display='grid';
+    loginInput.focus();
   };
+  document.getElementById('btnCancelCreds').onclick = ()=> loginModal.style.display='none';
 
-  el('btnSubmitCreds').onclick=()=>{
-    const login=(loginInput.value||'').trim();
-    const password=(passInput.value||'').trim();
-    if(!login||!password){ alert('Введи логин и пароль'); return; }
-    loginModal.style.display='none'; show('progress');
-
-    // отправляем данные боту (в chat), чтобы он спарсил и прислал нам скрытую ссылку
-    const payload = { kind: "login_hse_slow", start_url: AUTH_START_URL, login, password };
-    try{
-      tg?.sendData?.(JSON.stringify(payload));
-      // дальше пользователь нажмёт "Открыть мини-аппу" из сообщения бота (оно удалится),
-      // мы подхватим #data и окажемся тут с готовыми курсами
-    }catch(e){
-      alert('Не удалось отправить данные боту: '+e.message);
-      show('connect');
-    }
-  };
+  function markStep(key, state){ // 'active'|'done'
+    const el = document.querySelector(`.step[data-k="${key}"]`);
+    if(!el) return;
+    document.querySelectorAll('.step').forEach(s=>s.classList.remove('active'));
+    el.classList.add(state);
+    if(state==='active') el.classList.remove('done');
+    if(state==='done') el.classList.add('done');
+  }
 
   function renderCourses(list){
     grid.innerHTML = list.map((t,i)=>`
@@ -155,23 +177,72 @@
         <div class="chip">${String(i+1).padStart(2,'0')}</div>
         <h3>${t}</h3>
         <p>Курс твоей ОП</p>
-      </div>`).join('');
-    setTimeout(()=>document.querySelectorAll('.tile').forEach(t=>t.classList.add('in')),0);
+      </div>
+    `).join('');
+    setTimeout(()=>document.querySelectorAll('.tile').forEach(t=>t.classList.add('in')), 0);
   }
 
-  function safeGet(k){
-    try{ return JSON.parse(localStorage.getItem(k)||"null"); }catch{return null}
+  async function api(path, body){
+    const res = await fetch(API_BASE+path, {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify(body)
+    });
+    if(!res.ok) throw new Error(await res.text());
+    return res.json();
   }
 
-  // base64url → Uint8Array
-  function base64UrlToBytes(b64url){
-    const pad = '='.repeat((4 - b64url.length % 4) % 4);
-    const b64 = (b64url + pad).replace(/-/g,'+').replace(/_/g,'/');
-    const binStr = atob(b64);
-    const arr = new Uint8Array(binStr.length);
-    for(let i=0;i<binStr.length;i++) arr[i] = binStr.charCodeAt(i);
-    return arr;
-  }
+  // Первый вход: логин + парс + сохранение
+  document.getElementById('btnSubmitCreds').onclick = async ()=>{
+    const login = (loginInput.value||'').trim();
+    const password = (passInput.value||'').trim();
+    if(!login || !password){ alert('Введи логин и пароль'); return; }
+    loginModal.style.display='none';
+    show('progress');
+
+    try{
+      markStep('launch','active');
+      const r1 = await api('/api/login_and_parse', { tg_user_id: TG_ID, start_url: AUTH_START_URL, login, password });
+      // сервер вернёт поэтапный статус — просто двигаем шаги
+      markStep('launch','done');   markStep('login','done');
+      markStep('courses','done');  markStep('parse','done');
+      markStep('save','done');
+      meta.textContent = `Синхронизировано • найдено ${r1.count} предметов`;
+      renderCourses(r1.courses || []);
+      show('library');
+    }catch(e){
+      alert('Ошибка синхронизации: '+e.message);
+      show('connect');
+    }
+  };
+
+  // Повторная синхронизация без логина (используем сохранённую сессию Chrome)
+  document.getElementById('btnRefresh').onclick = async ()=>{
+    show('progress');
+    markStep('launch','active');
+    try{
+      const r = await api('/api/refresh_courses', { tg_user_id: TG_ID });
+      ['launch','login','courses','parse','save'].forEach(k=>markStep(k,'done'));
+      meta.textContent = `Обновлено • ${r.count} предметов`;
+      renderCourses(r.courses || []);
+      show('library');
+    }catch(e){
+      alert('Не удалось обновить: '+e.message);
+      show('library');
+    }
+  };
+
+  // Если у юзера уже есть предметы — сразу показываем
+  (async ()=>{
+    try{
+      const res = await api('/api/get_courses', { tg_user_id: TG_ID });
+      if(res.courses && res.courses.length){
+        meta.textContent = `Синхронизировано ранее • ${res.courses.length} предметов`;
+        renderCourses(res.courses);
+        show('library');
+      }
+    }catch{ /* молчим */ }
+  })();
 </script>
 </body>
 </html>

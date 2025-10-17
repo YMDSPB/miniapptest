@@ -4,7 +4,6 @@
 import os
 import re
 import json
-import base64
 import asyncio
 import logging
 import socket
@@ -12,7 +11,8 @@ import subprocess
 import tempfile
 import time
 import random
-from typing import List, Optional, Tuple
+from pathlib import Path
+from typing import Dict, Any, Optional, Tuple, List
 
 from dotenv import load_dotenv
 from aiogram import Bot, Dispatcher, F
@@ -26,11 +26,15 @@ from playwright.sync_api import (
     Frame,
 )
 
-# ========== CONFIG ==========
+from openai import OpenAI
+
+# ========= CONFIG =========
 
 load_dotenv()
 BOT_TOKEN = os.getenv("BOT_TOKEN", "")
-WEBAPP_URL = os.getenv("WEBAPP_URL", "")  # твой постоянный URL на Pages
+WEBAPP_URL = os.getenv("WEBAPP_URL", "")
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
+OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
 
 if not BOT_TOKEN or not WEBAPP_URL:
     raise RuntimeError("В .env должны быть BOT_TOKEN и WEBAPP_URL")
@@ -39,37 +43,49 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s | %(levelname)s | %(
 log = logging.getLogger("miniapp")
 dp = Dispatcher()
 
-def kb_open():
+DB_PATH = Path("storage.json")
+
+def load_db() -> Dict[str, Any]:
+    if DB_PATH.exists():
+        try:
+            return json.load(open(DB_PATH, "r", encoding="utf-8"))
+        except Exception:
+            return {}
+    return {}
+
+def save_db(data: Dict[str, Any]):
+    json.dump(data, open(DB_PATH, "w", encoding="utf-8"), ensure_ascii=False, indent=2)
+
+def kb():
     return ReplyKeyboardMarkup(
         keyboard=[[KeyboardButton(text="Открыть мини-аппу", web_app=WebAppInfo(url=WEBAPP_URL))]],
         resize_keyboard=True
     )
 
-# ========== CHROME HELPERS ==========
+# ========= CHROME HELPERS =========
 
 def _free_port() -> int:
-    import socket as _s
-    with _s.socket(_s.AF_INET, _s.SOCK_STREAM) as s:
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
         s.bind(("127.0.0.1", 0))
         return s.getsockname()[1]
 
-def _chrome_candidates():
+def _chrome_candidates() -> Tuple[str, ...]:
     return (
         os.environ.get("GOOGLE_CHROME_BIN") or "",
         "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
         "google-chrome", "chrome", "chromium", "chromium-browser"
     )
 
-def _launch_chrome(profile_dir: Optional[str] = None) -> Tuple[int, str]:
+def _launch_chrome(profile_dir: Optional[str] = None) -> Tuple[subprocess.Popen, int, str]:
     port = _free_port()
     profile = profile_dir or tempfile.mkdtemp(prefix="chrome-hse-")
 
     exe = None
     for c in _chrome_candidates():
-        if c and (os.path.exists(c) or c in ("google-chrome","chrome","chromium","chromium-browser")):
+        if c and (os.path.exists(c) or c in ("google-chrome", "chrome")):
             exe = c; break
     if not exe:
-        raise RuntimeError("Chrome не найден! Установи Google Chrome.")
+        raise RuntimeError("Chrome не найден!")
 
     args = [
         exe,
@@ -79,31 +95,22 @@ def _launch_chrome(profile_dir: Optional[str] = None) -> Tuple[int, str]:
         "--start-maximized", "about:blank"
     ]
     subprocess.Popen(args, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    time.sleep(3)
+    return None, port, profile
 
-    # подождём порт
-    deadline = time.time() + 10
-    while time.time() < deadline:
-        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-            if s.connect_ex(("127.0.0.1", port)) == 0:
-                break
-        time.sleep(0.2)
-    return port, profile
 
-# ========== LOGIN & PARSE ==========
+# ========= PLAYWRIGHT LOGIN & PARSE =========
 
-HUMAN_DELAY_MS = 400  # реалистичная печать
+HUMAN_DELAY_MS = 400  # 160 симв/мин
 COURSES_URL = "https://edu.hse.ru/my/courses.php"
 
-BAN_SUBSTRINGS = [
-    "кабинет","инструкции","категория курса","в начало","техническая поддержка",
-    "уо юриспруденция","научно","orientation","адаптационный курс","minor","майнор",
-    "тестирование","экзамен","exam","внутренний","независимый",
-    "учебник","цифровая грамотность","digital literacy",
-    "physical training","физическая культура","soft skills",
-]
-
-def _human_pause(a=350, b=750):
+def human_pause(a=350, b=750):
     time.sleep(random.uniform(a/1000, b/1000))
+
+def _iter_frames(page: Page):
+    yield page.main_frame
+    for f in page.frames:
+        yield f
 
 def _find(fr: Frame, sels: List[str], timeout=6000):
     for sel in sels:
@@ -115,171 +122,171 @@ def _find(fr: Frame, sels: List[str], timeout=6000):
             continue
     return None
 
-def _normalize_title(s: str) -> str:
-    s = re.sub(r"\([^)]*\)", "", s)
-    s = re.sub(r"[–—-].*$", "", s)
-    s = re.sub(r"\s+", " ", s)
-    s = s.replace("Название курса", "")
-    return s.strip(" ,;:·—–-").strip()
 
-def _prefilter(lines: List[str]) -> List[str]:
-    out, seen = [], set()
-    for t in lines:
-        if len(t) < 6: 
-            continue
-        low = t.lower()
-        if any(b in low for b in BAN_SUBSTRINGS):
-            continue
-        t2 = _normalize_title(t)
-        if len(t2) < 3: 
-            continue
-        k = t2.lower()
-        if k not in seen:
-            seen.add(k); out.append(t2)
-    return out
+def login_and_parse_courses(user_id: int, start_url: str, login: str, password: str) -> str:
+    """Полный сценарий: логин → переход на курсы → парсинг → GPT"""
+    proc, port, profile = _launch_chrome()
 
-def login_and_collect_courses(start_url: str, username: str, password: str) -> List[str]:
-    port, _profile = _launch_chrome()
     with sync_playwright() as p:
         browser = p.chromium.connect_over_cdp(f"http://127.0.0.1:{port}")
         context = browser.contexts[0] if browser.contexts else browser.new_context()
         page = context.new_page()
 
-        # 1) логин-страница
+        # Шаг 1: открываем логин
         page.goto(start_url, wait_until="domcontentloaded", timeout=60_000)
-        try: page.wait_for_load_state("networkidle", timeout=10_000)
-        except PWTimeout: pass
+        try:
+            page.wait_for_load_state("networkidle", timeout=10_000)
+        except PWTimeout:
+            pass
 
-        # 2) нажать «Войти»
-        clicked = False
-        for sel in ['text=Войти','button:has-text("Войти")','input[type="submit"]']:
-            try: page.locator(sel).first.click(timeout=2000); clicked=True; break
-            except: continue
-        if not clicked:
-            try: page.mouse.click(650, 400)
-            except: pass
-        _human_pause(900, 1400)
+        # Кликаем «Войти»
+        try:
+            page.locator("text=Войти").first.click(timeout=4000)
+        except Exception:
+            try:
+                page.mouse.click(650, 400)
+            except:
+                pass
+        human_pause(1000, 1500)
 
-        # 3) SSO вкладка
+        # Переход в новое окно (SSO)
         try:
             newp = context.wait_for_event("page", timeout=6000)
             page = newp
         except Exception:
             pass
 
-        try: page.wait_for_load_state("domcontentloaded", timeout=30_000)
-        except PWTimeout: pass
+        page.wait_for_load_state("domcontentloaded", timeout=30_000)
 
-        # 4) вводим по-человечески
-        login_sel = ['#username','input[name="username"]','input[type="email"]']
-        pass_sel  = ['#password','input[name="password"]']
-        submit_sel= ['#kc-login','button[type="submit"]','input[type="submit"]']
+        # Находим поля логина/пароля
+        login_sel = ['#username', 'input[name="username"]', 'input[type="email"]']
+        pass_sel = ['#password', 'input[name="password"]']
+        submit_sel = ['#kc-login', 'button[type="submit"]', 'input[type="submit"]']
 
         fr = page.main_frame
-        le = _find(fr, login_sel)
-        pe = _find(fr, pass_sel)
-        se = _find(fr, submit_sel)
-        if not (le and pe):
-            browser.close()
-            return []
+        login_el = _find(fr, login_sel)
+        pass_el = _find(fr, pass_sel)
+        submit_el = _find(fr, submit_sel)
 
-        le.click(); le.fill("")
-        for ch in username: le.type(ch, delay=HUMAN_DELAY_MS)
-        _human_pause(500, 800)
-        pe.click()
-        for ch in password: pe.type(ch, delay=HUMAN_DELAY_MS)
-        _human_pause(500, 900)
-        if se: se.click()
-        else: pe.press("Enter")
+        if not (login_el and pass_el):
+            return "Не нашёл форму логина — проверь SSO страницу."
 
-        try: page.wait_for_load_state("networkidle", timeout=25_000)
-        except PWTimeout: pass
+        # Медленно вводим данные
+        login_el.click()
+        for ch in login: login_el.type(ch, delay=HUMAN_DELAY_MS)
+        human_pause(500, 800)
+        pass_el.click()
+        for ch in password: pass_el.type(ch, delay=HUMAN_DELAY_MS)
+        human_pause(500, 900)
+        submit_el.click()
+        page.wait_for_load_state("networkidle", timeout=25_000)
 
-        # 5) мои курсы
+        # После входа → переходим на страницу курсов
         page.goto(COURSES_URL, wait_until="domcontentloaded", timeout=60_000)
         try: page.wait_for_load_state("networkidle", timeout=20_000)
         except PWTimeout: pass
 
-        # 6) сбор текстов
-        raw = []
-        for sel in ["a",".course-title",".media-body",".card","h1,h2,h3"]:
+        # Парсим текст
+        titles = []
+        for el in page.locator("a, .card, h3").all():
             try:
-                for el in page.locator(sel).all():
-                    try:
-                        t = el.inner_text(timeout=500).strip()
-                        if t: raw.append(t)
-                    except: pass
-            except: pass
+                t = el.inner_text(timeout=500).strip()
+                if len(t) > 5: titles.append(t)
+            except:
+                continue
+
+        # Фильтруем мусор
+        clean = []
+        for t in titles:
+            if any(x in t.lower() for x in ["в начало", "инструкции", "кабинет", "категория курса"]):
+                continue
+            clean.append(t)
+
+        # Убираем мусор в скобках и дубликаты
+        norm = []
+        for t in clean:
+            t = re.sub(r"\([^)]*\)", "", t)
+            t = re.sub(r"[-–—].*", "", t)
+            t = re.sub(r"\s+", " ", t).strip()
+            if len(t) >= 5 and t not in norm:
+                norm.append(t)
+
+        # Прогоняем через GPT
+                # Прогоняем через GPT
+        oai = OpenAI(api_key=OPENAI_API_KEY)
+        prompt = (
+            "Ты — ассистент академического офиса университета. "
+            "На вход тебе подаётся список названий курсов из студенческой LMS. "
+            "Твоя задача — выделить только реальные учебные дисциплины, "
+            "которые соответствуют предметам семестра: уголовное право, философия, "
+            "конституционное право, экономика и т.п.\n\n"
+            "Удаляй всё, что не является учебным предметом, включая:\n"
+            "- любые тестирования, экзамены, внутренние или внешние проверки знаний\n"
+            "- учебники, адаптационные или ориентационные курсы, кампании по выбору майноров\n"
+            "- курсы по цифровой грамотности, физической культуре и любым soft skills\n"
+            "- технические или служебные разделы вроде 'УО Юриспруденция', 'Научно', 'Инструкции'\n"
+            "- дублирующиеся дисциплины с одинаковыми названиями\n\n"
+            "Оставь только названия настоящих академических предметов, без указания модулей, годов, преподавателей. "
+            "Результат выведи в виде короткого списка (по одному предмету на строку, без нумерации, без лишнего текста). "
+            "Например:\n\n"
+            "Уголовное право\nГражданское право\nКонституционное право\nФилософия\nИстория государства и права\nРимское право\nЭкономика\nЮридическая методология\nСудебная власть и правоохранительные органы\n\n"
+            "Вот входные данные:\n\n" + "\n".join(norm)
+        )
+
+        resp = oai.responses.create(model=OPENAI_MODEL, input=prompt)
+        text = resp.output_text.strip()
 
         browser.close()
-    # 7) предфильтр
-    prelim = _prefilter(raw)
-    return prelim
 
-# ========== BOT (минимум: принять веб-данные, распарсить, перекинуть в мини-аппу через #hash и удалить сообщение) ==========
+    return f"Нашёл {len(norm)} курсов, вот итоговый список:\n\n{text}"
+
+
+# ========= BOT =========
 
 @dp.message(CommandStart())
 async def start(m: Message):
     await m.answer(
-        "Жми «Открыть мини-аппу», введи логин/пароль — дальше всё сделаю тихо.\n"
-        "Список курсов попадает в мини-аппу невидимо.",
-        reply_markup=kb_open()
+        "Жми «Открыть мини-аппу» → введи логин и пароль от ЛМС, "
+        "я сам залогинюсь, соберу твои предметы и пришлю список.",
+        reply_markup=kb()
     )
 
 @dp.message(F.web_app_data)
 async def from_webapp(m: Message):
-    # ожидаем, что мини-аппа прислала JSON с полями: kind, login, password, start_url
     try:
         data = json.loads(m.web_app_data.data)
-    except Exception:
+    except:
         await m.answer("Ошибка данных из мини-аппы.")
         return
 
-    if data.get("kind") != "login_hse_slow":
+    if data.get("kind") == "login_hse_slow":
+        login = data.get("login", "").strip()
+        password = data.get("password", "").strip()
+        start_url = data.get("start_url", "https://edu.hse.ru/login/hselogin.php")
+
+        if not login or not password:
+            await m.answer("Введи логин и пароль.")
+            return
+
+        await m.answer("Открываю Chrome и выполняю вход... Это займёт около минуты, не пугайся ⚙️")
+
+        def work():
+            return login_and_parse_courses(m.from_user.id, start_url, login, password)
+
+        try:
+            result = await asyncio.to_thread(work)
+            await m.answer(result)
+        except Exception as e:
+            log.exception("Ошибка Playwright")
+            await m.answer(f"Не удалось завершить вход: {e}")
+    else:
         await m.answer("Неизвестная операция.")
-        return
 
-    login = (data.get("login") or "").strip()
-    password = (data.get("password") or "").strip()
-    start_url = (data.get("start_url") or "https://edu.hse.ru/login/hselogin.php").strip()
+# ========= MAIN =========
 
-    if not login or not password:
-        await m.answer("Введи логин и пароль.")
-        return
+async def main():
+    bot = Bot(BOT_TOKEN)
+    await dp.start_polling(bot)
 
-    # 1) парсим
-    def work():
-        return login_and_collect_courses(start_url, login, password)
-
-    await m.answer("Секунду, синхронизирую ЛМС…")  # будет удалено сразу
-    courses = await asyncio.to_thread(work)
-
-    # 2) запаковываем в hash (base64url(JSON))
-    payload = {
-        "uid": m.from_user.id,
-        "ts": int(time.time()),
-        "courses": courses
-    }
-    raw = json.dumps(payload, ensure_ascii=False, separators=(",",":")).encode("utf-8")
-    b64 = base64.urlsafe_b64encode(raw).decode("ascii")
-    url = f"{WEBAPP_URL}#data={b64}"
-
-    # 3) отправляем невидимую кнопку на мини-аппу и удаляем
-    msg = await m.answer(
-        "Готово ✅ Открываем мини-аппу…",
-        reply_markup=ReplyKeyboardMarkup(
-            keyboard=[[KeyboardButton(text="Открыть мини-аппу", web_app=WebAppInfo(url=url))]],
-            resize_keyboard=True
-        )
-    )
-    # микро-пауза и удалить оба сообщения
-    await asyncio.sleep(0.5)
-    try:
-        await m.bot.delete_message(m.chat.id, msg.message_id)
-    except Exception:
-        pass
-    try:
-        # удалить предыдущее "Секунду, синхронизирую ЛМС…"
-        await m.bot.delete_message(m.chat.id, m.message_id + 1)
-    except Exception:
-        pass
+if __name__ == "__main__":
+    asyncio.run(main())
