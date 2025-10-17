@@ -73,7 +73,13 @@
   <section id="library" class="screen library">
     <div class="wrap">
       <div class="lib-head">
-        <div><h1 style="margin:0">Библиотека предметов</h1><div class="hint">ЛМС подключена • Синхронизация активна</div></div>
+        <div>
+          <h1 style="margin:0">Библиотека предметов</h1>
+          <div class="hint">ЛМС подключена • Синхронизация активна</div>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center">
+          <button id="btnFetchCourses" class="cta">Собрать предметы</button>
+        </div>
       </div>
       <div class="grid" id="grid"></div>
     </div>
@@ -91,7 +97,7 @@
         <button id="btnSubmitCreds" class="cta">Войти</button>
         <button id="btnCancelCreds" class="cta" style="background:linear-gradient(180deg,#666,#444)">Отмена</button>
       </div>
-      <div class="hint" style="margin-top:8px">Откроется Chrome, нажмёт «Войти», заполнит форму медленно и оставит окно открытым.</div>
+      <div class="hint" style="margin-top:8px">Откроется Chrome, нажмём «Войти», заполним форму медленно и оставим окно открытым.</div>
     </div>
   </div>
 
@@ -103,6 +109,7 @@
     const connect = document.getElementById('connect');
     const library = document.getElementById('library');
     const btnConnect = document.getElementById('btnConnect');
+    const btnFetchCourses = document.getElementById('btnFetchCourses');
     const grid = document.getElementById('grid');
 
     const loginModal = document.getElementById('loginModal');
@@ -144,6 +151,13 @@
       }catch(e){
         alert("Не удалось отправить в бота: " + e);
       }
+    });
+
+    btnFetchCourses.addEventListener('click', ()=>{
+      try{
+        tg?.sendData(JSON.stringify({ kind:"parse_courses" }));
+        tg?.HapticFeedback?.impactOccurred('light');
+      }catch(e){ alert("Не удалось отправить команду: "+e); }
     });
 
     function renderLibrary(){
