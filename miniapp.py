@@ -12,7 +12,7 @@ import tempfile
 import time
 import random
 from pathlib import Path
-from typing import Dict, Any, Iterable, Optional, Tuple, List
+from typing import Dict, Any, Optional, Tuple, List
 
 from dotenv import load_dotenv
 from aiogram import Bot, Dispatcher, F
@@ -26,20 +26,22 @@ from playwright.sync_api import (
     Frame,
 )
 
-# =========== CONFIG ===========
+from openai import OpenAI
+
+# ========= CONFIG =========
 
 load_dotenv()
-BOT_TOKEN  = (os.getenv("BOT_TOKEN") or "").strip()
-WEBAPP_URL = (os.getenv("WEBAPP_URL") or "").strip()
-OPENAI_API_KEY = (os.getenv("OPENAI_API_KEY") or "").strip()
-OPENAI_MODEL   = os.getenv("OPENAI_MODEL", "gpt-4o-mini").strip()
+BOT_TOKEN = os.getenv("BOT_TOKEN", "")
+WEBAPP_URL = os.getenv("WEBAPP_URL", "")
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
+OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
 
 if not BOT_TOKEN or not WEBAPP_URL:
     raise RuntimeError("В .env должны быть BOT_TOKEN и WEBAPP_URL")
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s | %(levelname)s | %(message)s")
 log = logging.getLogger("miniapp")
-dp  = Dispatcher()
+dp = Dispatcher()
 
 DB_PATH = Path("storage.json")
 
@@ -51,16 +53,16 @@ def load_db() -> Dict[str, Any]:
             return {}
     return {}
 
-def save_db(data: Dict[str, Any]) -> None:
+def save_db(data: Dict[str, Any]):
     json.dump(data, open(DB_PATH, "w", encoding="utf-8"), ensure_ascii=False, indent=2)
 
-def kb() -> ReplyKeyboardMarkup:
+def kb():
     return ReplyKeyboardMarkup(
         keyboard=[[KeyboardButton(text="Открыть мини-аппу", web_app=WebAppInfo(url=WEBAPP_URL))]],
-        resize_keyboard=True, is_persistent=True
+        resize_keyboard=True
     )
 
-# =========== Chrome via CDP helpers ===========
+# ========= CHROME HELPERS =========
 
 def _free_port() -> int:
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
@@ -68,390 +70,206 @@ def _free_port() -> int:
         return s.getsockname()[1]
 
 def _chrome_candidates() -> Tuple[str, ...]:
-    mac = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
     return (
         os.environ.get("GOOGLE_CHROME_BIN") or "",
-        mac, "google-chrome", "chrome", "chromium", "chromium-browser"
+        "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+        "google-chrome", "chrome", "chromium", "chromium-browser"
     )
 
-def _launch_external_chrome(user_profile_dir: Optional[str] = None) -> Tuple[subprocess.Popen, int, str]:
-    """
-    Стартуем внешний Chrome. Если user_profile_dir задан — используем его,
-    чтобы подхватить существующую сессию. Возвращает (proc, port, profile_dir).
-    """
+def _launch_chrome(profile_dir: Optional[str] = None) -> Tuple[subprocess.Popen, int, str]:
     port = _free_port()
-    profile = user_profile_dir or tempfile.mkdtemp(prefix="chrome-studentplus-")
+    profile = profile_dir or tempfile.mkdtemp(prefix="chrome-hse-")
 
     exe = None
     for c in _chrome_candidates():
-        if c and (os.path.exists(c) or c in ("google-chrome","chrome","chromium","chromium-browser")):
+        if c and (os.path.exists(c) or c in ("google-chrome", "chrome")):
             exe = c; break
     if not exe:
-        raise RuntimeError("Chrome не найден. Поставь Google Chrome и повтори.")
+        raise RuntimeError("Chrome не найден!")
 
     args = [
         exe,
         f"--remote-debugging-port={port}",
         f"--user-data-dir={profile}",
         "--no-first-run", "--no-default-browser-check",
-        "--start-maximized",
-        "about:blank",
+        "--start-maximized", "about:blank"
     ]
-    log.info("Запуск внешнего Chrome: %s", " ".join(args))
-    proc = subprocess.Popen(args, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    subprocess.Popen(args, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    time.sleep(3)
+    return None, port, profile
 
-    # ждём порт
-    deadline = time.time() + 10
-    while time.time() < deadline:
-        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-            if s.connect_ex(("127.0.0.1", port)) == 0:
-                break
-        time.sleep(0.2)
-    else:
-        raise RuntimeError("CDP-порт Chrome не поднялся")
-    return proc, port, profile
 
-# =========== Playwright helpers ===========
+# ========= PLAYWRIGHT LOGIN & PARSE =========
 
-def _iter_frames(page: Page) -> Iterable[Frame]:
+HUMAN_DELAY_MS = 400  # 160 симв/мин
+COURSES_URL = "https://edu.hse.ru/my/courses.php"
+
+def human_pause(a=350, b=750):
+    time.sleep(random.uniform(a/1000, b/1000))
+
+def _iter_frames(page: Page):
     yield page.main_frame
-    for fr in page.frames:
-        yield fr
+    for f in page.frames:
+        yield f
 
-def _first_visible(fr: Frame, sels, timeout=4000):
+def _find(fr: Frame, sels: List[str], timeout=6000):
     for sel in sels:
-        loc = fr.locator(sel)
         try:
+            loc = fr.locator(sel)
             loc.first.wait_for(state="visible", timeout=timeout)
             return loc.first
         except Exception:
             continue
     return None
 
-# ускорили печать вдвое: ~160 симв/мин
-HUMAN_DELAY_MS = 375
 
-def _human_pause(min_ms=350, max_ms=800):
-    time.sleep(random.uniform(min_ms/1000, max_ms/1000))
-
-# =========== LOGIN FLOW ===========
-
-def login_via_hse_portal(user_id: int, start_url: str, username: str, password: str) -> str:
-    """
-    1) Открыть https://edu.hse.ru/login/hselogin.php
-    2) Нажать «Войти»
-    3) Заполнить форму SSO медленно
-    4) Сохранить порт и профиль для юзера
-    5) Окно НЕ закрывать
-    """
-    # если у юзера уже есть живой порт — не стартуем новый
-    db = load_db()
-    rec = db.get(str(user_id)) or {}
-    port = rec.get("cdp_port")
-    profile = rec.get("chrome_profile")
-
-    # всегда стартуем новый Chrome (надежнее), но с тем же profile если есть
-    proc, port, profile = _launch_external_chrome(profile)
+def login_and_parse_courses(user_id: int, start_url: str, login: str, password: str) -> str:
+    """Полный сценарий: логин → переход на курсы → парсинг → GPT"""
+    proc, port, profile = _launch_chrome()
 
     with sync_playwright() as p:
         browser = p.chromium.connect_over_cdp(f"http://127.0.0.1:{port}")
         context = browser.contexts[0] if browser.contexts else browser.new_context()
         page = context.new_page()
 
+        # Шаг 1: открываем логин
         page.goto(start_url, wait_until="domcontentloaded", timeout=60_000)
-        try: page.wait_for_load_state("networkidle", timeout=10_000)
-        except PWTimeout: pass
-
-        # «Войти»
-        clicked = False
-        for sel in [
-            'button:has-text("Войти")',
-            'text=Войти',
-            'button >> text=/Войти/i',
-            'input[type="submit"]',
-            'a:has-text("Войти")'
-        ]:
-            try:
-                page.locator(sel).first.click(timeout=2000)
-                clicked = True
-                break
-            except Exception:
-                continue
-        if not clicked:
-            page.mouse.click(640, 380)
-        _human_pause(600, 1000)
-
         try:
-            newp = context.wait_for_event("page", timeout=4000)
+            page.wait_for_load_state("networkidle", timeout=10_000)
+        except PWTimeout:
+            pass
+
+        # Кликаем «Войти»
+        try:
+            page.locator("text=Войти").first.click(timeout=4000)
+        except Exception:
+            try:
+                page.mouse.click(650, 400)
+            except:
+                pass
+        human_pause(1000, 1500)
+
+        # Переход в новое окно (SSO)
+        try:
+            newp = context.wait_for_event("page", timeout=6000)
             page = newp
         except Exception:
             pass
 
-        try: page.wait_for_load_state("domcontentloaded", timeout=30_000)
-        except PWTimeout: pass
-        try: page.wait_for_load_state("networkidle", timeout=15_000)
-        except PWTimeout: pass
+        page.wait_for_load_state("domcontentloaded", timeout=30_000)
 
-        login_selectors = ['#username','input[name="username"]','input[type="email"]','input[type="text"]']
-        pass_selectors  = ['#password','input[name="password"]','input[type="password"]']
-        submit_selectors= ['#kc-login','button[type="submit"]','input[type="submit"]',
-                           'button:has-text("Войти")','button:has-text("Log in")','button:has-text("Sign in")']
+        # Находим поля логина/пароля
+        login_sel = ['#username', 'input[name="username"]', 'input[type="email"]']
+        pass_sel = ['#password', 'input[name="password"]']
+        submit_sel = ['#kc-login', 'button[type="submit"]', 'input[type="submit"]']
 
-        login_el = pass_el = submit_el = None
-        used_frame: Optional[Frame] = None
-        for fr in _iter_frames(page):
-            if not login_el: login_el = _first_visible(fr, login_selectors, timeout=8000)
-            if not pass_el:  pass_el  = _first_visible(fr, pass_selectors,  timeout=8000)
-            if not submit_el:submit_el= _first_visible(fr, submit_selectors, timeout=4000)
-            if login_el and pass_el:
-                used_frame = fr
-                break
+        fr = page.main_frame
+        login_el = _find(fr, login_sel)
+        pass_el = _find(fr, pass_sel)
+        submit_el = _find(fr, submit_sel)
 
         if not (login_el and pass_el):
-            try: browser.close()
-            except: pass
-            return "Не нашёл форму логина HSE SSO. Проверь поток входа."
+            return "Не нашёл форму логина — проверь SSO страницу."
 
-        # печатаем медленно (x2 быстрее, чем раньше)
-        login_el.click(); login_el.fill("")
-        for ch in username: login_el.type(ch, delay=HUMAN_DELAY_MS)
-        _human_pause(500, 900)
+        # Медленно вводим данные
+        login_el.click()
+        for ch in login: login_el.type(ch, delay=HUMAN_DELAY_MS)
+        human_pause(500, 800)
         pass_el.click()
         for ch in password: pass_el.type(ch, delay=HUMAN_DELAY_MS)
-        _human_pause(400, 800)
+        human_pause(500, 900)
+        submit_el.click()
+        page.wait_for_load_state("networkidle", timeout=25_000)
 
-        if submit_el: submit_el.click()
-        else: pass_el.press("Enter")
-
+        # После входа → переходим на страницу курсов
+        page.goto(COURSES_URL, wait_until="domcontentloaded", timeout=60_000)
         try: page.wait_for_load_state("networkidle", timeout=20_000)
         except PWTimeout: pass
 
-        # сохраняем порт и профиль для следующей операции
-        rec.update({"cdp_port": port, "chrome_profile": profile})
-        db[str(user_id)] = rec
-        save_db(db)
+        # Парсим текст
+        titles = []
+        for el in page.locator("a, .card, h3").all():
+            try:
+                t = el.inner_text(timeout=500).strip()
+                if len(t) > 5: titles.append(t)
+            except:
+                continue
 
-        try: browser.close()  # только CDP-сессию
-        except: pass
+        # Фильтруем мусор
+        clean = []
+        for t in titles:
+            if any(x in t.lower() for x in ["в начало", "инструкции", "кабинет", "категория курса"]):
+                continue
+            clean.append(t)
 
-        return "Вход выполнен ✅, окно оставил открытым."
+        # Убираем мусор в скобках и дубликаты
+        norm = []
+        for t in clean:
+            t = re.sub(r"\([^)]*\)", "", t)
+            t = re.sub(r"[-–—].*", "", t)
+            t = re.sub(r"\s+", " ", t).strip()
+            if len(t) >= 5 and t not in norm:
+                norm.append(t)
 
-# =========== COURSES PARSE ===========
+        # Прогоняем через GPT
+        oai = OpenAI(api_key=OPENAI_API_KEY)
+        prompt = (
+            "Ты должен из списка удалить дубликаты и лишнюю информацию "
+            "(годы, модули, преподавателей и факультеты), оставив только короткие "
+            "названия предметов. Верни чистый список по одному на строку:\n\n"
+            + "\n".join(norm)
+        )
 
-COURSES_URL = "https://edu.hse.ru/my/courses.php"
+        resp = oai.responses.create(model=OPENAI_MODEL, input=prompt)
+        text = resp.output_text.strip()
 
-def _connect_or_launch_from_profile(profile: str, port_hint: Optional[int]) -> Tuple[int, str]:
-    """
-    Пытаемся подключиться к уже живому Chrome по port_hint.
-    Если не удалось — поднимаем новый Chrome с тем же профилем.
-    Возвращает (port, profile)
-    """
-    if port_hint:
-        try:
-            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-                if s.connect_ex(("127.0.0.1", port_hint)) == 0:
-                    return port_hint, profile
-        except Exception:
-            pass
-    # стартуем новый
-    _proc, port, profile = _launch_external_chrome(profile)
-    return port, profile
+        browser.close()
 
-def extract_course_titles(page: Page) -> List[str]:
-    """
-    Тянем максимум текста и фильтруем до вероятных названий курсов.
-    """
-    # попробуем разумные селекторы
-    candidates = []
-    sel_list = [
-        'a', 'h1,h2,h3,h4,h5',
-        '.course-title', '.media-body', '.list-group-item',
-        '.card', '.card-body'
-    ]
-    for sel in sel_list:
-        try:
-            for el in page.locator(sel).all():
-                try:
-                    t = el.inner_text(timeout=1000).strip()
-                    if t: candidates.append(t)
-                except Exception:
-                    continue
-        except Exception:
-            continue
+    return f"Нашёл {len(norm)} курсов, вот итоговый список:\n\n{text}"
 
-    # нарезаем на строки
-    lines: List[str] = []
-    for block in candidates:
-        for line in re.split(r'[\n\r]+', block):
-            l = line.strip()
-            if l: lines.append(l)
 
-    # фильтрация мусора
-    ban_phrases = [
-        "Личный кабинет", "Мои курсы", "Инструкции", "Техническая поддержка",
-        "Категория курса", "Название курса", "выполнено", "В начало"
-    ]
-    def looks_like_course(s: str) -> bool:
-        if any(bp.lower() in s.lower() for bp in ban_phrases): return False
-        if len(s) < 8: return False
-        if not re.search(r'[А-Яа-яA-Za-z]', s): return False
-        return True
-
-    lines = [s for s in lines if looks_like_course(s)]
-
-    # хард-нормализация: убираем всё в скобках/после «—»/«-» и лишние пробелы
-    def normalize(s: str) -> str:
-        s1 = re.sub(r'\([^()]*\)', '', s)  # вырезаем (....)
-        # несколько раз — вдруг вложенные скобки
-        s1 = re.sub(r'\([^()]*\)', '', s1)
-        s1 = re.sub(r'—.*$', '', s1)  # после длинного тире
-        s1 = re.sub(r'-.*$', '', s1)  # после дефиса
-        s1 = re.sub(r'\s+', ' ', s1).strip(' ,;:–—')
-        # иногда дублируется «Название курса...»
-        s1 = s1.replace("Название курса", "").strip()
-        return s1
-
-    prelim = [normalize(s) for s in lines]
-    prelim = [s for s in prelim if len(s) >= 3]
-
-    # грубая дедупликация до GPT
-    uniq = []
-    seen = set()
-    for s in prelim:
-        key = s.lower()
-        if key not in seen:
-            uniq.append(s)
-            seen.add(key)
-    return uniq
-
-# OpenAI (Responses API)
-from openai import OpenAI
-oai = OpenAI(api_key=OPENAI_API_KEY) if OPENAI_API_KEY else None
-
-def canonicalize_with_gpt(titles: List[str]) -> List[str]:
-    """
-    Отдаём GPT список, просим вернуть короткие канонические названия без дубликатов.
-    """
-    if not titles:
-        return []
-    if not oai:
-        return titles  # если ключа нет — возвращаем как есть
-
-    prompt = (
-        "Ты помощник, который приводит названия университетских курсов к краткой канонической форме.\n"
-        "Правила:\n"
-        "— Удали упоминания преподавателей, годов, модулей, групп, факультетов и прочих пояснений.\n"
-        "— Сохрани только краткое название предмета (например, «Гражданское право»).\n"
-        "— Объедини повторы/варианты в один пункт.\n"
-        "— Верни только итоговый список, по одному названию на строку, без нумерации и комментариев.\n\n"
-        "Список исходных строк:\n" + "\n".join(f"- {t}" for t in titles)
-    )
-
-    resp = oai.responses.create(model=OPENAI_MODEL, input=prompt)
-    text = resp.output_text.strip()
-    # разбираем по строкам
-    out = [re.sub(r'^\s*[-•\d.)]+\s*', '', ln).strip() for ln in text.splitlines()]
-    out = [ln for ln in out if ln]
-    # финальная дедупликация
-    seen = set(); res = []
-    for s in out:
-        k = s.lower()
-        if k not in seen:
-            seen.add(k); res.append(s)
-    return res
-
-def parse_courses_for_user(user_id: int) -> Tuple[List[str], str]:
-    """
-    Коннект к текущему Chrome (или запуск с тем же профилем), переход на courses.php,
-    парсинг, прогон через GPT. Возвращает (финальный_список, источник_сообщение).
-    """
-    db = load_db()
-    rec = db.get(str(user_id))
-    if not rec or not rec.get("chrome_profile"):
-        return [], "Сначала нужно войти в ЛМС через кнопку «Подключить» в мини-аппе."
-
-    port_hint = rec.get("cdp_port")
-    profile   = rec.get("chrome_profile")
-    port, profile = _connect_or_launch_from_profile(profile, port_hint)
-
-    with sync_playwright() as p:
-        browser = p.chromium.connect_over_cdp(f"http://127.0.0.1:{port}")
-        context = browser.contexts[0] if browser.contexts else browser.new_context()
-        page = context.new_page()
-
-        page.goto(COURSES_URL, wait_until="domcontentloaded", timeout=60_000)
-        try: page.wait_for_load_state("networkidle", timeout=15_000)
-        except PWTimeout: pass
-
-        titles_raw = extract_course_titles(page)
-        try: browser.close()
-        except: pass
-
-    cleaned = canonicalize_with_gpt(titles_raw)
-    return cleaned, f"Нашёл {len(titles_raw)} строк(и), после чистки — {len(cleaned)} предмет(а)."
-
-# =========== Bot Handlers ===========
+# ========= BOT =========
 
 @dp.message(CommandStart())
-async def on_start(m: Message):
+async def start(m: Message):
     await m.answer(
-        "Бро, жми «Открыть мини-аппу» → «Подключить» — залогиню тебя в ЛМС.\n"
-        "Потом кнопка «Собрать предметы» — спарсю курсы и пришлю список сюда.",
+        "Жми «Открыть мини-аппу» → введи логин и пароль от ЛМС, "
+        "я сам залогинюсь, соберу твои предметы и пришлю список.",
         reply_markup=kb()
     )
 
 @dp.message(F.web_app_data)
-async def on_webapp(m: Message):
+async def from_webapp(m: Message):
     try:
         data = json.loads(m.web_app_data.data)
-    except Exception:
-        await m.answer("Не смог распарсить данные из мини-аппы.")
+    except:
+        await m.answer("Ошибка данных из мини-аппы.")
         return
 
-    kind = (data.get("kind") or "").strip()
+    if data.get("kind") == "login_hse_slow":
+        login = data.get("login", "").strip()
+        password = data.get("password", "").strip()
+        start_url = data.get("start_url", "https://edu.hse.ru/login/hselogin.php")
 
-    if kind == "login_hse_slow":
-        username = (data.get("login") or "").strip()
-        password = (data.get("password") or "").strip()
-        start_url = (data.get("start_url") or "https://edu.hse.ru/login/hselogin.php").strip()
-
-        if not (username and password):
+        if not login or not password:
             await m.answer("Введи логин и пароль.")
             return
 
-        await m.answer("Открываю Chrome и выполняю вход… Печатаю побыстрее, но по-человечески 🙂")
+        await m.answer("Открываю Chrome и выполняю вход... Это займёт около минуты, не пугайся ⚙️")
 
-        def run_login():
-            return login_via_hse_portal(m.from_user.id, start_url, username, password)
+        def work():
+            return login_and_parse_courses(m.from_user.id, start_url, login, password)
 
         try:
-            result = await asyncio.to_thread(run_login)
+            result = await asyncio.to_thread(work)
             await m.answer(result)
         except Exception as e:
-            log.exception("Playwright error")
-            await m.answer(f"Playwright упал: {e}")
-
-    elif kind == "parse_courses":
-        await m.answer("Иду на страницу «Мои курсы», собираю названия…")
-
-        def run_parse():
-            return parse_courses_for_user(m.from_user.id)
-
-        try:
-            final_list, info = await asyncio.to_thread(run_parse)
-            if not final_list:
-                await m.answer(info)
-                return
-            pretty = "\n".join(f"• {x}" for x in final_list)
-            await m.answer(f"{info}\n\n*Твои предметы:*\n{pretty}", parse_mode="Markdown")
-        except Exception as e:
-            log.exception("Parse error")
-            await m.answer(f"Не смог собрать курсы: {e}")
-
+            log.exception("Ошибка Playwright")
+            await m.answer(f"Не удалось завершить вход: {e}")
     else:
-        await m.answer(f"Неизвестная операция: {kind}")
+        await m.answer("Неизвестная операция.")
 
-# =========== main ===========
+# ========= MAIN =========
 
 async def main():
     bot = Bot(BOT_TOKEN)
