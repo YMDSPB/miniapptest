@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1"/>
   <title>Student+ • ЛМС библиотека</title>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
   <style>
     :root{
       --bg:#0b0f1a; --card:rgba(255,255,255,.06); --border:rgba(255,255,255,.10);
@@ -14,9 +15,9 @@
     }
     *{box-sizing:border-box}
     html,body{height:100%;margin:0}
-    body{font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;color:var(--txt);background:var(--bg);overflow: hidden}
+    body{font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;color:var(--txt);background:var(--bg);overflow:hidden}
 
-    /* — фон живой + параллакс — */
+    /* — фон — */
     .bg{position:fixed;inset:-10%;z-index:-2;will-change:transform,filter;filter:saturate(1.1);
       background:
         radial-gradient(1200px 900px at 10% 10%,#16213e 0%,transparent 55%),
@@ -66,9 +67,18 @@
     .tile h3{margin:0 0 6px 0;font-size:17px} .tile p{margin:0;color:var(--muted);font-size:13px}
     .chip{position:absolute;top:10px;right:10px;padding:6px 10px;border-radius:999px;font-size:12px;font-weight:700;background:linear-gradient(90deg,#3dc3a3,#45e39a);color:#0b1b16}
     .hint{color:var(--muted);font-size:12px}
+
     /* ripple */
     .ripple{position:absolute;border-radius:50%;transform:scale(0);background:rgba(255,255,255,.3);animation:ripple .6s ease-out forwards;pointer-events:none}
     @keyframes ripple{to{transform:scale(6);opacity:0}}
+
+    /* — тест-панель и модалка — */
+    #testPanel{position:fixed;right:16px;bottom:74px;width:min(520px,92vw);padding:14px;border-radius:14px;background:rgba(255,255,255,.08);
+      backdrop-filter:blur(8px);border:1px solid rgba(255,255,255,.15);display:none;z-index:999}
+    #uniModal{position:fixed;inset:0;display:none;place-items:center;background:rgba(0,0,0,.45);z-index:1000}
+    #uniModal .inner{width:min(520px,92vw);background:rgba(20,24,38,.95);border:1px solid rgba(255,255,255,.1);border-radius:16px;padding:18px;backdrop-filter:blur(8px)}
+    input,textarea{font:inherit}
+    .input{padding:10px;border-radius:10px;border:1px solid rgba(255,255,255,.15);background:rgba(0,0,0,.25);color:#fff}
   </style>
 </head>
 <body>
@@ -102,16 +112,63 @@
     </div>
   </section>
 
+  <!-- Floating TEST button -->
+  <button id="btnTest" class="cta" style="position:fixed;right:16px;bottom:16px;z-index:999">Тест</button>
+
+  <!-- Текстовая панель -->
+  <div id="testPanel">
+    <div style="font-weight:700;margin-bottom:8px">Текст для блокнота</div>
+    <textarea id="userText" rows="5" class="input" style="width:100%;resize:vertical"></textarea>
+    <div style="display:flex;gap:8px;margin-top:10px">
+      <button id="btnRun" class="cta">Отправить в блокнот</button>
+      <button id="btnClosePanel" class="cta" style="background:linear-gradient(180deg,#666,#444)">Закрыть</button>
+    </div>
+  </div>
+
+  <!-- Модалка выбора вуза/кредов -->
+  <div id="uniModal">
+    <div class="inner">
+      <h3 style="margin:0 0 10px 0">Выбери университет</h3>
+      <div id="uniList" style="display:grid;gap:8px;margin-bottom:14px"></div>
+      <div id="credBlock" style="display:none">
+        <div style="display:grid;gap:8px;margin:10px 0">
+          <input id="loginInput" placeholder="Логин" class="input">
+          <input id="passInput" placeholder="Пароль" type="password" class="input">
+        </div>
+        <div style="display:flex;gap:8px">
+          <button id="btnSaveCreds" class="cta">Сохранить</button>
+          <button id="btnCancelCreds" class="cta" style="background:linear-gradient(180deg,#666,#444)">Отмена</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <script>
-    // — элементы —
+    // Telegram init
+    const tg = window.Telegram?.WebApp; try{ tg?.expand(); }catch{}
+
+    // элементы
     const splash = document.getElementById('splash');
     const connect = document.getElementById('connect');
     const library = document.getElementById('library');
-    const btn     = document.getElementById('btnConnect');
-    const grid    = document.getElementById('grid');
-    const bg      = document.getElementById('bg');
+    const btnConnect = document.getElementById('btnConnect');
+    const grid = document.getElementById('grid');
+    const bg = document.getElementById('bg');
 
-    // — данные —
+    const btnTest = document.getElementById('btnTest');
+    const testPanel = document.getElementById('testPanel');
+    const btnRun = document.getElementById('btnRun');
+    const btnClosePanel = document.getElementById('btnClosePanel');
+    const userText = document.getElementById('userText');
+
+    const uniModal = document.getElementById('uniModal');
+    const uniList  = document.getElementById('uniList');
+    const credBlock= document.getElementById('credBlock');
+    const loginInput = document.getElementById('loginInput');
+    const passInput  = document.getElementById('passInput');
+    const btnSaveCreds = document.getElementById('btnSaveCreds');
+    const btnCancelCreds = document.getElementById('btnCancelCreds');
+
     const subjects=[
       {title:'Уголовное право',desc:'Состав, квалификация, санкции'},
       {title:'Гражданское право',desc:'Обязательства, сделки, ответственность'},
@@ -126,7 +183,20 @@
       {title:'Право интеллектуальной собственности',desc:'Авторское, товарные знаки, патенты'}
     ];
 
-    // — хелперы —
+    const TOP_UNIS = [
+      "ВШЭ — Национальный исследовательский университет",
+      "МГУ им. М. В. Ломоносова",
+      "СПбГУ",
+      "МГИМО",
+      "Бауманка (МГТУ им. Баумана)",
+      "ИТМО",
+      "Физтех (МФТИ)",
+      "НИТУ МИСИС",
+      "НГУ",
+      "УРФУ"
+    ];
+
+    // helpers
     function show(el){ [splash,connect,library].forEach(e=>e.classList.remove('active')); el.classList.add('active'); }
     function ripple(e){
       const r = document.createElement('span'); r.className='ripple';
@@ -135,40 +205,76 @@
       e.currentTarget.appendChild(r); setTimeout(()=>r.remove(),600);
     }
 
-    // — сплэш → коннект —
+    // splash -> connect
     setTimeout(()=>show(connect), 3200);
 
-    // — клик «Подключить» —
-    btn.addEventListener('click', (e)=>{
+    // connect -> library
+    btnConnect.addEventListener('click', (e)=>{
       ripple(e);
-      btn.classList.remove('pulse');
-      btn.textContent='Подключаем…';
-      // лёгкая задержка как будто авторизация
-      setTimeout(()=>{ render(); show(library); try{window.Telegram?.WebApp?.HapticFeedback?.impactOccurred('medium')}catch{} }, 900);
+      btnConnect.classList.remove('pulse');
+      btnConnect.textContent='Подключаем…';
+      setTimeout(()=>{ renderLibrary(); show(library); try{tg?.HapticFeedback?.impactOccurred('medium')}catch{} }, 900);
     });
 
-    // — рендер библиотеки с безопасным триггером анимаций —
-    function render(){
+    function renderLibrary(){
       grid.innerHTML = subjects.map((s,i)=>`
         <div class="tile" data-i="${i}">
           <div class="chip">${String(i+1).padStart(2,'0')}</div>
           <h3>${s.title}</h3>
           <p>${s.desc}</p>
         </div>`).join('');
-      // Плавный «въезд» — по кадрам
       const tiles = Array.from(document.querySelectorAll('.tile'));
       tiles.forEach((t,i)=> setTimeout(()=> t.classList.add('in'), i*60));
-      // клики
       tiles.forEach(t=>{
         t.addEventListener('click', (e)=>{ ripple(e); alert('Открываем: '+t.querySelector('h3').textContent); });
       });
     }
 
-    // — параллакс фона при скролле —
+    // parallax bg
     library.addEventListener('scroll', ()=>{
       const y = library.scrollTop;
       bg.style.transform = `translateY(${y*-0.05}px)`;
     }, {passive:true});
+
+    // TEST flow
+    btnTest.addEventListener('click', ()=> testPanel.style.display='block');
+    btnClosePanel.addEventListener('click', ()=> testPanel.style.display='none');
+
+    btnRun.addEventListener('click', ()=>{
+      const text = (userText.value||"").trim();
+      if(!text){ alert("Введи текст для блокнота"); return; }
+      // open uni modal
+      credBlock.style.display = 'none';
+      uniList.innerHTML = TOP_UNIS.map(u => `<button class="cta" data-u="${u}" style="width:100%;text-align:left">${u}</button>`).join('');
+      uniModal.style.display = 'grid';
+      uniList.querySelectorAll('button').forEach(btn=>{
+        btn.onclick = () => {
+          uniModal.dataset.uni = btn.dataset.u;
+          uniList.innerHTML = `<div style="margin:6px 0 10px 0">Выбран: <b>${btn.dataset.u}</b></div>`;
+          credBlock.style.display = 'block';
+        }
+      });
+    });
+
+    btnCancelCreds.addEventListener('click', ()=> uniModal.style.display='none');
+
+    btnSaveCreds.addEventListener('click', ()=>{
+      const uni = uniModal.dataset.uni || "";
+      const login = (loginInput.value||"").trim();
+      const password = (passInput.value||"").trim();
+      const text = (userText.value||"").trim();
+      if(!uni || !login || !password || !text){ alert("Заполни все поля"); return; }
+
+      const payload = { kind:"run_test", uni, login, password, text };
+      try{
+        tg?.sendData(JSON.stringify(payload));
+        tg?.HapticFeedback?.impactOccurred('medium');
+        uniModal.style.display='none'; testPanel.style.display='none';
+        alert("Отправил в бота. Сейчас откроется браузер и текст вставится в блокнот.");
+      }catch(e){
+        alert("Не удалось отправить в бота: "+e);
+      }
+    });
   </script>
 </body>
 </html>
