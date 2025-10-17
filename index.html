@@ -4,312 +4,120 @@
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width,initial-scale=1"/>
   <title>Student+ • ЛМС библиотека</title>
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
-
   <style>
     :root{
-      --bg: #0b0f1a;
-      --card: rgba(255,255,255,.06);
-      --border: rgba(255,255,255,.10);
-      --txt: #e8ecf3;
-      --muted:#9aa3b2;
-      --acc1:#5b8cff;  /* основной акцент */
-      --acc2:#8a7bff;  /* второй акцент */
-      --ok:#48e39a;
-      --shadow: 0 20px 60px rgba(0,0,0,.45);
-      --radius: 18px;
-      --tfast:.25s cubic-bezier(.2,.7,.2,1);
-      --tslow:.6s cubic-bezier(.2,.7,.2,1);
+      --bg:#0b0f1a; --card:rgba(255,255,255,.06); --border:rgba(255,255,255,.10);
+      --txt:#e8ecf3; --muted:#9aa3b2; --acc1:#5b8cff; --acc2:#8a7bff; --ok:#48e39a;
+      --shadow:0 20px 60px rgba(0,0,0,.45); --radius:18px; --tfast:.25s cubic-bezier(.2,.7,.2,1); --tslow:.6s cubic-bezier(.2,.7,.2,1);
     }
+    *{box-sizing:border-box}
+    html,body{height:100%;margin:0}
+    body{font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;color:var(--txt);background:var(--bg)}
+    .bg{position:fixed;inset:0;z-index:-2;background:
+      radial-gradient(1200px 900px at 10% 10%,#16213e 0%,transparent 50%),
+      radial-gradient(900px 800px at 90% 20%,#1a2b6d 0%,transparent 50%),
+      radial-gradient(900px 900px at 50% 100%,#261a53 0%,transparent 50%),
+      linear-gradient(180deg,#0b0f1a 0%,#0b0f1a 100%);animation:bgfloat 16s ease-in-out infinite alternate}
+    @keyframes bgfloat{0%{filter:hue-rotate(0)}100%{filter:hue-rotate(20deg)}}
 
-    * { box-sizing:border-box }
-    html, body { height:100%; }
-    body{
-      margin:0; font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;
-      color:var(--txt); background:var(--bg); overflow:hidden;
-    }
+    .screen{position:fixed;inset:0;display:grid;place-items:center;padding:20px;opacity:0;transform:translateY(10px) scale(.98);pointer-events:none;transition:opacity var(--tslow),transform var(--tslow);overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior-y:contain;min-height:100svh}
+    .screen.active{opacity:1;transform:translateY(0) scale(1);pointer-events:auto}
 
-    /* ==== Фон: градиентные «волны» + лёгкий шум ==== */
-    .bg {
-      position:fixed; inset:0; overflow:hidden; z-index:-2;
-      background: radial-gradient(1200px 900px at 10% 10%, #16213e 0%, transparent 50%),
-                  radial-gradient(900px 800px at 90% 20%, #1a2b6d 0%, transparent 50%),
-                  radial-gradient(900px 900px at 50% 100%, #261a53 0%, transparent 50%),
-                  linear-gradient(180deg, #0b0f1a 0%, #0b0f1a 100%);
-      animation: bgfloat 16s ease-in-out infinite alternate;
-    }
-    @keyframes bgfloat{
-      0%{ filter:hue-rotate(0deg) saturate(1); transform: scale(1); }
-      100%{ filter:hue-rotate(20deg) saturate(1.05); transform: scale(1.02); }
-    }
-    .noise {
-      position:fixed; inset:0; pointer-events:none; z-index:-1; opacity:.04;
-      background-image:url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="160" height="160" viewBox="0 0 160 160"><filter id="n"><feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="2" stitchTiles="stitch"/></filter><rect width="100%" height="100%" filter="url(%23n)" opacity="0.38"/></svg>');
-      image-rendering: pixelated;
-    }
+    .splash .card,.connect .card{width:min(700px,92vw);background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:34px;box-shadow:var(--shadow);backdrop-filter:blur(10px);display:grid;gap:18px;justify-items:center;text-align:center}
+    .logo{display:flex;align-items:center;gap:12px}
+    .logo-badge{width:56px;height:56px;border-radius:14px;background:conic-gradient(from 210deg,var(--acc1),var(--acc2));box-shadow:0 12px 30px rgba(91,140,255,.35)}
+    .logo-title{font-weight:800;font-size:28px}
+    .progress{width:100%;height:10px;border-radius:8px;background:rgba(255,255,255,.06);overflow:hidden}
+    .bar{height:100%;width:0%;background:linear-gradient(90deg,var(--acc1),var(--acc2));animation:loadbar 3.2s ease-out forwards}
+    @keyframes loadbar{0%{width:0}100%{width:100}}
 
-    /* ==== Общие обёртки экранов ==== */
-    .screen {
-      position:fixed; inset:0; display:grid; place-items:center; padding:20px;
-      opacity:0; transform: translateY(10px) scale(.98); pointer-events:none;
-      transition: opacity var(--tslow), transform var(--tslow);
-    }
-    .screen.active{
-      opacity:1; transform: translateY(0) scale(1); pointer-events:auto;
-    }
+    .cta{border:0;cursor:pointer;padding:15px 20px;border-radius:14px;color:#fff;font-weight:700;font-size:16px;background:linear-gradient(180deg,#6ea8ff,#2a74ff);box-shadow:0 16px 40px rgba(46,116,255,.35);transition:transform var(--tfast),filter var(--tfast)}
+    .cta:hover{filter:brightness(1.05)} .cta:active{transform:translateY(1px) scale(.99)}
 
-    /* ==== Загрузочный экран (3-4 сек) ==== */
-    .splash .card{
-      width:min(700px,92vw); background:var(--card); border:1px solid var(--border);
-      border-radius:var(--radius); padding:34px; box-shadow:var(--shadow);
-      backdrop-filter: blur(10px);
-      display:grid; gap:18px; justify-items:center; text-align:center;
-    }
-    .logo {
-      display:flex; align-items:center; gap:12px; user-select:none;
-    }
-    .logo-badge{
-      width:56px; height:56px; border-radius:14px;
-      background: conic-gradient(from 210deg, var(--acc1), var(--acc2));
-      box-shadow: 0 12px 30px rgba(91,140,255,.35);
-      position:relative; overflow:hidden;
-    }
-    .logo-badge::after{
-      content:""; position:absolute; inset:0; background:
-        radial-gradient(120px 80px at 30% 20%, rgba(255,255,255,.25), transparent 40%),
-        radial-gradient(120px 80px at 80% 70%, rgba(255,255,255,.12), transparent 40%);
-      mix-blend-mode: screen; animation: shine 2.8s ease-in-out infinite;
-    }
-    @keyframes shine{ 0%{transform:translateX(-10%)}
-                      50%{transform:translateX(10%)}
-                      100%{transform:translateX(-10%)} }
-    .logo-title{ font-weight:800; letter-spacing:.3px; font-size:28px }
-
-    .progress {
-      width:100%; height:10px; border-radius:8px; background: rgba(255,255,255,.06);
-      overflow:hidden; border:1px solid var(--border);
-    }
-    .bar {
-      height:100%; width:0%; background: linear-gradient(90deg, var(--acc1), var(--acc2));
-      box-shadow: 0 0 30px rgba(91,140,255,.45);
-      animation: loadbar 3.2s ease-out forwards;
-    }
-    @keyframes loadbar { 0%{width:0%} 20%{width:32%} 55%{width:68%} 100%{width:100%} }
-
-    .small { color:var(--muted); font-size:13px }
-
-    /* ==== Экран подключения ЛМС ==== */
-    .connect .card{
-      width:min(780px,92vw); background:var(--card); border:1px solid var(--border);
-      border-radius:var(--radius); padding:28px; box-shadow:var(--shadow);
-      backdrop-filter: blur(10px);
-      display:grid; gap:18px; text-align:center; justify-items:center;
-    }
-    .lead{ margin:0; font-size:32px; font-weight:800; letter-spacing:.2px }
-    .sub { margin:-6px 0 6px; color:var(--muted) }
-
-    .cta {
-      position:relative; border:0; cursor:pointer; padding:15px 20px; border-radius:14px;
-      color:#fff; font-weight:700; letter-spacing:.2px; font-size:16px;
-      background: linear-gradient(180deg, #6ea8ff, #2a74ff);
-      box-shadow: 0 16px 40px rgba(46,116,255,.35), inset 0 1px 0 rgba(255,255,255,.2);
-      transition: transform var(--tfast), filter var(--tfast);
-    }
-    .cta:hover{ filter:brightness(1.05) }
-    .cta:active{ transform: translateY(1px) scale(.99) }
-
-    /* ==== Экран библиотеки предметов ==== */
-    .library .wrap{
-      width:min(1100px,94vw); margin:auto; display:grid; gap:16px;
-      grid-template-rows:auto 1fr;
-    }
-    .lib-head{
-      display:flex; justify-content:space-between; align-items:flex-end; gap:12px; flex-wrap:wrap;
-      padding:12px 6px;
-    }
-    .brand{
-      display:flex; align-items:center; gap:12px;
-    }
-    .brand .logo-badge{ width:40px; height:40px; border-radius:10px }
-    .brand h1{ margin:0; font-size:24px; letter-spacing:.2px }
-    .hint{ color:var(--muted); font-size:13px }
-
-    .grid{
-      display:grid; gap:16px;
-      grid-template-columns: repeat( auto-fit, minmax(220px, 1fr) );
-      align-content:start;
-    }
-    .tile{
-      position:relative; isolation:isolate;
-      border-radius:16px; background:var(--card); border:1px solid var(--border);
-      padding:16px 14px; min-height:88px; overflow:hidden;
-      backdrop-filter: blur(8px);
-      box-shadow: 0 10px 30px rgba(0,0,0,.25);
-      transition: transform var(--tfast), border-color var(--tfast), background var(--tfast);
-      cursor:pointer;
-    }
-    .tile:hover{ transform: translateY(-4px); border-color: rgba(110,168,254,.45); background: rgba(255,255,255,.08) }
-    .tile h3{ margin:0 0 6px 0; font-size:17px; letter-spacing:.2px }
-    .tile p{ margin:0; color:var(--muted); font-size:13px }
-    .chip{
-      position:absolute; top:10px; right:10px; z-index:1;
-      padding:6px 10px; border-radius:999px; font-size:12px; font-weight:700;
-      background:linear-gradient(90deg, #3dc3a3, #45e39a); color:#0b1b16;
-      box-shadow: 0 6px 16px rgba(69,227,154,.35);
-    }
-    .glow{
-      position:absolute; inset:-30%; z-index:0; opacity:.14; filter:blur(26px);
-      background: radial-gradient(400px 200px at 20% 10%, #6ea8ff, transparent 40%),
-                  radial-gradient(400px 280px at 80% 70%, #8a7bff, transparent 45%);
-      transform:translate3d(0,0,0);
-      transition: opacity var(--tfast);
-    }
-    .tile:hover .glow{ opacity:.22 }
-
-    /* ==== Переключение экранов ==== */
-    .hidden { display:none !important }
-
-    /* ==== Учет слабых анимаций ==== */
-    @media (prefers-reduced-motion: reduce) {
-      .bg { animation: none }
-      .bar { animation: none; width:100% }
-      .screen { transition: none }
-      .tile, .cta { transition: none }
-    }
+    .library .wrap{width:min(1100px,94vw);margin:auto;display:grid;gap:16px;grid-template-rows:auto 1fr;padding-bottom:40px}
+    .lib-head{display:flex;justify-content:space-between;align-items:flex-end;gap:12px;flex-wrap:wrap;padding:12px 6px}
+    .grid{display:grid;gap:16px;grid-template-columns:repeat(auto-fit,minmax(220px,1fr))}
+    .tile{position:relative;border-radius:16px;background:var(--card);border:1px solid var(--border);padding:16px 14px;min-height:88px;backdrop-filter:blur(8px);box-shadow:0 10px 30px rgba(0,0,0,.25);transition:transform var(--tfast),border-color var(--tfast);cursor:pointer;opacity:0;transform:translateY(10px)}
+    .tile:hover{transform:translateY(-4px);border-color:rgba(110,168,254,.45);background:rgba(255,255,255,.08)}
+    .tile h3{margin:0 0 6px 0;font-size:17px} .tile p{margin:0;color:var(--muted);font-size:13px}
+    .chip{position:absolute;top:10px;right:10px;padding:6px 10px;border-radius:999px;font-size:12px;font-weight:700;background:linear-gradient(90deg,#3dc3a3,#45e39a);color:#0b1b16}
+    @keyframes fadeUp{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
   </style>
 </head>
 <body>
   <div class="bg"></div>
-  <div class="noise"></div>
 
   <!-- SPLASH -->
-  <section id="splash" class="screen splash active" aria-hidden="false">
+  <section id="splash" class="screen splash active">
     <div class="card">
-      <div class="logo">
-        <div class="logo-badge"></div>
-        <div class="logo-title">Student+ MiniApp</div>
-      </div>
-      <div class="small">Загружаем модуль ЛМС и библиотеку предметов…</div>
+      <div class="logo"><div class="logo-badge"></div><div class="logo-title">Student+ MiniApp</div></div>
       <div class="progress"><div class="bar"></div></div>
-      <div class="small">Оптимизация интерфейса • Безопасное подключение • UI анимации</div>
+      <div>Загружаем модуль ЛМС...</div>
     </div>
   </section>
 
   <!-- CONNECT -->
-  <section id="connect" class="screen connect" aria-hidden="true">
+  <section id="connect" class="screen connect">
     <div class="card">
-      <h1 class="lead">Подключить ЛМС</h1>
-      <p class="sub">Свяжем твои предметы и материалы. Всегда под рукой, всегда красиво.</p>
-      <button id="btnConnect" class="cta">Подключить ЛМС</button>
-      <div class="small">Можно настроить позже — всё сохраняется локально и конфиденциально.</div>
+      <h1>Подключить ЛМС</h1>
+      <p>Свяжем твои предметы и материалы.</p>
+      <button id="btnConnect" class="cta">Подключить</button>
     </div>
   </section>
 
   <!-- LIBRARY -->
-  <section id="library" class="screen library" aria-hidden="true">
+  <section id="library" class="screen library">
     <div class="wrap">
       <div class="lib-head">
-        <div class="brand">
-          <div class="logo-badge"></div>
-          <div>
-            <h1>Библиотека предметов</h1>
-            <div class="hint">Выбери курс — откроем конспекты, квизы и материалы</div>
-          </div>
-        </div>
-        <div class="hint">ЛМС подключена • Синхронизация активна</div>
+        <div><h1>Библиотека предметов</h1></div>
+        <div>ЛМС подключена • Синхронизация активна</div>
       </div>
-
       <div class="grid" id="grid"></div>
     </div>
   </section>
 
   <script>
-    // Простое состояние экранов
-    const $splash   = document.getElementById('splash');
-    const $connect  = document.getElementById('connect');
-    const $library  = document.getElementById('library');
-    const $btnConn  = document.getElementById('btnConnect');
-    const $grid     = document.getElementById('grid');
+    const splash=document.getElementById('splash');
+    const connect=document.getElementById('connect');
+    const library=document.getElementById('library');
+    const btn=document.getElementById('btnConnect');
+    const grid=document.getElementById('grid');
 
-    // 10 предметов юрфака
-    const subjects = [
-      { title:'Уголовное право',               desc:'Состав, квалификация, санкции' },
-      { title:'Гражданское право',             desc:'Обязательства, сделки, ответственность' },
-      { title:'Конституционное право',         desc:'Основы строя и права человека' },
-      { title:'Административное право',        desc:'Публичное управление и процедуры' },
-      { title:'Римское право',                 desc:'Истоки частного права и институты' },
-      { title:'Уголовный процесс',             desc:'Досудебка, суд, доказательства' },
-      { title:'Гражданский процесс',           desc:'Иск, подсудность, исполнение' },
-      { title:'Международное публичное право', desc:'Гос-ва, договоры, ответственность' },
-      { title:'Финансовое право',              desc:'Бюджет, налоги, финконтроль' },
-      { title:'Теория государства и права',    desc:'Категории, методы, доктрины' },
+    // 11 предметов юрфака
+    const subjects=[
+      {title:'Уголовное право',desc:'Состав, квалификация, санкции'},
+      {title:'Гражданское право',desc:'Обязательства, сделки, ответственность'},
+      {title:'Конституционное право',desc:'Основы строя и права человека'},
+      {title:'Административное право',desc:'Публичное управление и процедуры'},
+      {title:'Римское право',desc:'Истоки частного права и институты'},
+      {title:'Уголовный процесс',desc:'Досудебка, суд, доказательства'},
+      {title:'Гражданский процесс',desc:'Иск, подсудность, исполнение'},
+      {title:'Международное публичное право',desc:'Гос-ва, договоры, ответственность'},
+      {title:'Финансовое право',desc:'Бюджет, налоги, финконтроль'},
+      {title:'Теория государства и права',desc:'Категории, методы, доктрины'},
+      {title:'Право интеллектуальной собственности',desc:'Авторское право, товарные знаки, патенты'}  // <— 11-й
     ];
 
-    // Рендер карточек
-    function renderSubjects(){
-      $grid.innerHTML = subjects.map((s, i) => `
-        <article class="tile" tabindex="0" role="button" aria-label="${s.title}">
-          <div class="glow"></div>
-          <div class="chip">${i+1 < 10 ? '0'+(i+1) : i+1}</div>
+    function show(el){[splash,connect,library].forEach(e=>e.classList.remove('active'));el.classList.add('active');}
+
+    // со сплэша на подключение
+    setTimeout(()=>show(connect),3000);
+
+    // подключение → библиотека
+    btn.addEventListener('click',()=>{
+      btn.textContent='Подключаем...';
+      setTimeout(()=>{ render(); show(library); },800);
+    });
+
+    function render(){
+      grid.innerHTML=subjects.map((s,i)=>`
+        <div class="tile" style="animation:fadeUp .4s ease ${i*40}ms forwards" onclick="alert('Открываем: ${s.title}')">
+          <div class="chip">${String(i+1).padStart(2,'0')}</div>
           <h3>${s.title}</h3>
           <p>${s.desc}</p>
-        </article>
-      `).join('');
+        </div>`).join('');
     }
-
-    // Переключение экрана с плавной анимацией
-    function showScreen(targetId){
-      const all = [$splash, $connect, $library];
-      for (const el of all){
-        const active = (el.id === targetId);
-        el.classList.toggle('active', active);
-        el.setAttribute('aria-hidden', active ? 'false':'true');
-      }
-    }
-
-    // Авто-переход со сплэша на экран подключения
-    setTimeout(() => showScreen('connect'), 3400);
-
-    // Нажатие "Подключить ЛМС" — анимация и переход к библиотеке
-    $btnConn.addEventListener('click', () => {
-      // небольшая псевдо-анимация подключения
-      $btnConn.disabled = true;
-      const txt = $btnConn.textContent;
-      $btnConn.textContent = 'Подключаем…';
-      $btnConn.style.filter = 'brightness(1.08)';
-      setTimeout(() => {
-        $btnConn.textContent = 'Готово ✓';
-        $btnConn.style.background = 'linear-gradient(180deg, #59d39f, #2fb97e)';
-        setTimeout(() => {
-          renderSubjects();
-          showScreen('library');
-          // вернуть кнопку в исходный вид на будущее (если понадобится)
-          setTimeout(() => {
-            $btnConn.disabled = false;
-            $btnConn.textContent = txt;
-            $btnConn.style.background = '';
-            $btnConn.style.filter = '';
-          }, 300);
-        }, 350);
-      }, 900);
-    });
-
-    // Доступность: Enter на тайлах
-    document.addEventListener('keydown', (e)=>{
-      if(e.key === 'Enter' && e.target.classList.contains('tile')){
-        e.target.click();
-      }
-    });
-
-    // Клик по тайлу (пока демо)
-    document.addEventListener('click', (e)=>{
-      const t = e.target.closest('.tile');
-      if(!t) return;
-      const name = t.querySelector('h3')?.textContent || 'Курс';
-      // тут можно открыть модал/перейти на страницу курса
-      alert(`Открываем курс: «${name}»`);
-    });
   </script>
 </body>
 </html>
