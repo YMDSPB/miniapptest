@@ -9,60 +9,86 @@
     :root{
       --bg:#0b0f1a; --card:rgba(255,255,255,.06); --border:rgba(255,255,255,.10);
       --txt:#e8ecf3; --muted:#9aa3b2; --acc1:#5b8cff; --acc2:#8a7bff; --ok:#48e39a;
-      --shadow:0 20px 60px rgba(0,0,0,.45); --radius:18px; --tfast:.25s cubic-bezier(.2,.7,.2,1); --tslow:.6s cubic-bezier(.2,.7,.2,1);
+      --shadow:0 24px 70px rgba(0,0,0,.45); --radius:18px;
+      --tfast:.25s cubic-bezier(.2,.7,.2,1); --tslow:.6s cubic-bezier(.2,.7,.2,1);
     }
     *{box-sizing:border-box}
     html,body{height:100%;margin:0}
-    body{font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;color:var(--txt);background:var(--bg)}
-    .bg{position:fixed;inset:0;z-index:-2;background:
-      radial-gradient(1200px 900px at 10% 10%,#16213e 0%,transparent 50%),
-      radial-gradient(900px 800px at 90% 20%,#1a2b6d 0%,transparent 50%),
-      radial-gradient(900px 900px at 50% 100%,#261a53 0%,transparent 50%),
-      linear-gradient(180deg,#0b0f1a 0%,#0b0f1a 100%);animation:bgfloat 16s ease-in-out infinite alternate}
-    @keyframes bgfloat{0%{filter:hue-rotate(0)}100%{filter:hue-rotate(20deg)}}
+    body{font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;color:var(--txt);background:var(--bg);overflow: hidden}
 
-    .screen{position:fixed;inset:0;display:grid;place-items:center;padding:20px;opacity:0;transform:translateY(10px) scale(.98);pointer-events:none;transition:opacity var(--tslow),transform var(--tslow);overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior-y:contain;min-height:100svh}
+    /* — фон живой + параллакс — */
+    .bg{position:fixed;inset:-10%;z-index:-2;will-change:transform,filter;filter:saturate(1.1);
+      background:
+        radial-gradient(1200px 900px at 10% 10%,#16213e 0%,transparent 55%),
+        radial-gradient(900px 800px at 90% 20%,#1a2b6d 0%,transparent 55%),
+        radial-gradient(900px 900px at 50% 100%,#261a53 0%,transparent 55%),
+        linear-gradient(180deg,#0b0f1a 0%,#0b0f1a 100%);
+      animation:bgfloat 16s ease-in-out infinite alternate}
+    @keyframes bgfloat{0%{filter:hue-rotate(0)}100%{filter:hue-rotate(18deg)}}
+
+    /* — экраны — */
+    .screen{position:fixed;inset:0;display:grid;place-items:center;padding:20px;
+      opacity:0;transform:translateY(12px) scale(.985);pointer-events:none;
+      transition:opacity var(--tslow),transform var(--tslow);
+      overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior-y:contain;min-height:100svh}
     .screen.active{opacity:1;transform:translateY(0) scale(1);pointer-events:auto}
 
-    .splash .card,.connect .card{width:min(700px,92vw);background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:34px;box-shadow:var(--shadow);backdrop-filter:blur(10px);display:grid;gap:18px;justify-items:center;text-align:center}
+    /* — карточки контейнеров — */
+    .card{width:min(720px,92vw);background:var(--card);border:1px solid var(--border);
+      border-radius:var(--radius);padding:34px;box-shadow:var(--shadow);
+      backdrop-filter:blur(10px);display:grid;gap:18px;justify-items:center;text-align:center}
+
     .logo{display:flex;align-items:center;gap:12px}
-    .logo-badge{width:56px;height:56px;border-radius:14px;background:conic-gradient(from 210deg,var(--acc1),var(--acc2));box-shadow:0 12px 30px rgba(91,140,255,.35)}
+    .logo-badge{width:56px;height:56px;border-radius:14px;background:conic-gradient(from 210deg,var(--acc1),var(--acc2));box-shadow:0 12px 30px rgba(91,140,255,.35);animation:spin 10s linear infinite}
+    @keyframes spin{to{transform:rotate(1turn)}}
     .logo-title{font-weight:800;font-size:28px}
+
     .progress{width:100%;height:10px;border-radius:8px;background:rgba(255,255,255,.06);overflow:hidden}
     .bar{height:100%;width:0%;background:linear-gradient(90deg,var(--acc1),var(--acc2));animation:loadbar 3.2s ease-out forwards}
     @keyframes loadbar{0%{width:0}100%{width:100}}
 
-    .cta{border:0;cursor:pointer;padding:15px 20px;border-radius:14px;color:#fff;font-weight:700;font-size:16px;background:linear-gradient(180deg,#6ea8ff,#2a74ff);box-shadow:0 16px 40px rgba(46,116,255,.35);transition:transform var(--tfast),filter var(--tfast)}
-    .cta:hover{filter:brightness(1.05)} .cta:active{transform:translateY(1px) scale(.99)}
+    .cta{border:0;cursor:pointer;padding:15px 22px;border-radius:14px;color:#fff;font-weight:700;font-size:16px;
+      background:linear-gradient(180deg,#6ea8ff,#2a74ff);box-shadow:0 16px 40px rgba(46,116,255,.35);
+      transition:transform var(--tfast),filter var(--tfast)} 
+    .cta:hover{filter:brightness(1.06)} .cta:active{transform:translateY(1px) scale(.99)}
+    .cta.pulse{animation:pulse 1.6s ease-in-out infinite}
+    @keyframes pulse{0%,100%{box-shadow:0 16px 40px rgba(46,116,255,.35)}50%{box-shadow:0 22px 55px rgba(46,116,255,.55)}}
 
-    .library .wrap{width:min(1100px,94vw);margin:auto;display:grid;gap:16px;grid-template-rows:auto 1fr;padding-bottom:40px}
+    /* — библиотека — */
+    .library .wrap{width:min(1100px,94vw);margin:auto;display:grid;gap:16px;grid-template-rows:auto 1fr;padding:8px 0 40px}
     .lib-head{display:flex;justify-content:space-between;align-items:flex-end;gap:12px;flex-wrap:wrap;padding:12px 6px}
     .grid{display:grid;gap:16px;grid-template-columns:repeat(auto-fit,minmax(220px,1fr))}
-    .tile{position:relative;border-radius:16px;background:var(--card);border:1px solid var(--border);padding:16px 14px;min-height:88px;backdrop-filter:blur(8px);box-shadow:0 10px 30px rgba(0,0,0,.25);transition:transform var(--tfast),border-color var(--tfast);cursor:pointer;opacity:0;transform:translateY(10px)}
-    .tile:hover{transform:translateY(-4px);border-color:rgba(110,168,254,.45);background:rgba(255,255,255,.08)}
+    .tile{position:relative;border-radius:16px;background:var(--card);border:1px solid var(--border);padding:16px 14px;min-height:92px;
+      backdrop-filter:blur(8px);box-shadow:0 10px 30px rgba(0,0,0,.25);cursor:pointer;
+      opacity:0;transform:translateY(14px) scale(.98);will-change:transform,opacity;transition:transform var(--tfast),border-color var(--tfast),background var(--tfast)}
+    .tile:hover{transform:translateY(-4px) scale(1);border-color:rgba(110,168,254,.45);background:rgba(255,255,255,.08)}
+    .tile.in{opacity:1;transform:translateY(0) scale(1)}
     .tile h3{margin:0 0 6px 0;font-size:17px} .tile p{margin:0;color:var(--muted);font-size:13px}
     .chip{position:absolute;top:10px;right:10px;padding:6px 10px;border-radius:999px;font-size:12px;font-weight:700;background:linear-gradient(90deg,#3dc3a3,#45e39a);color:#0b1b16}
-    @keyframes fadeUp{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+    .hint{color:var(--muted);font-size:12px}
+    /* ripple */
+    .ripple{position:absolute;border-radius:50%;transform:scale(0);background:rgba(255,255,255,.3);animation:ripple .6s ease-out forwards;pointer-events:none}
+    @keyframes ripple{to{transform:scale(6);opacity:0}}
   </style>
 </head>
 <body>
-  <div class="bg"></div>
+  <div class="bg" id="bg"></div>
 
   <!-- SPLASH -->
-  <section id="splash" class="screen splash active">
+  <section id="splash" class="screen active">
     <div class="card">
       <div class="logo"><div class="logo-badge"></div><div class="logo-title">Student+ MiniApp</div></div>
       <div class="progress"><div class="bar"></div></div>
-      <div>Загружаем модуль ЛМС...</div>
+      <div class="hint">Загружаем модуль ЛМС…</div>
     </div>
   </section>
 
   <!-- CONNECT -->
-  <section id="connect" class="screen connect">
+  <section id="connect" class="screen">
     <div class="card">
-      <h1>Подключить ЛМС</h1>
-      <p>Свяжем твои предметы и материалы.</p>
-      <button id="btnConnect" class="cta">Подключить</button>
+      <h1 style="margin:6px 0 2px">Подключить ЛМС</h1>
+      <p class="hint" style="margin:0 0 6px">Свяжем предметы, материалы и квизы</p>
+      <button id="btnConnect" class="cta pulse">Подключить</button>
     </div>
   </section>
 
@@ -70,21 +96,22 @@
   <section id="library" class="screen library">
     <div class="wrap">
       <div class="lib-head">
-        <div><h1>Библиотека предметов</h1></div>
-        <div>ЛМС подключена • Синхронизация активна</div>
+        <div><h1 style="margin:0">Библиотека предметов</h1><div class="hint">ЛМС подключена • Синхронизация активна</div></div>
       </div>
       <div class="grid" id="grid"></div>
     </div>
   </section>
 
   <script>
-    const splash=document.getElementById('splash');
-    const connect=document.getElementById('connect');
-    const library=document.getElementById('library');
-    const btn=document.getElementById('btnConnect');
-    const grid=document.getElementById('grid');
+    // — элементы —
+    const splash = document.getElementById('splash');
+    const connect = document.getElementById('connect');
+    const library = document.getElementById('library');
+    const btn     = document.getElementById('btnConnect');
+    const grid    = document.getElementById('grid');
+    const bg      = document.getElementById('bg');
 
-    // 11 предметов юрфака
+    // — данные —
     const subjects=[
       {title:'Уголовное право',desc:'Состав, квалификация, санкции'},
       {title:'Гражданское право',desc:'Обязательства, сделки, ответственность'},
@@ -96,28 +123,52 @@
       {title:'Международное публичное право',desc:'Гос-ва, договоры, ответственность'},
       {title:'Финансовое право',desc:'Бюджет, налоги, финконтроль'},
       {title:'Теория государства и права',desc:'Категории, методы, доктрины'},
-      {title:'Право интеллектуальной собственности',desc:'Авторское право, товарные знаки, патенты'}  // <— 11-й
+      {title:'Право интеллектуальной собственности',desc:'Авторское, товарные знаки, патенты'}
     ];
 
-    function show(el){[splash,connect,library].forEach(e=>e.classList.remove('active'));el.classList.add('active');}
+    // — хелперы —
+    function show(el){ [splash,connect,library].forEach(e=>e.classList.remove('active')); el.classList.add('active'); }
+    function ripple(e){
+      const r = document.createElement('span'); r.className='ripple';
+      const rect = e.currentTarget.getBoundingClientRect();
+      r.style.left = (e.clientX-rect.left)+'px'; r.style.top = (e.clientY-rect.top)+'px'; r.style.width=r.style.height=Math.max(rect.width,rect.height)+'px';
+      e.currentTarget.appendChild(r); setTimeout(()=>r.remove(),600);
+    }
 
-    // со сплэша на подключение
-    setTimeout(()=>show(connect),3000);
+    // — сплэш → коннект —
+    setTimeout(()=>show(connect), 3200);
 
-    // подключение → библиотека
-    btn.addEventListener('click',()=>{
-      btn.textContent='Подключаем...';
-      setTimeout(()=>{ render(); show(library); },800);
+    // — клик «Подключить» —
+    btn.addEventListener('click', (e)=>{
+      ripple(e);
+      btn.classList.remove('pulse');
+      btn.textContent='Подключаем…';
+      // лёгкая задержка как будто авторизация
+      setTimeout(()=>{ render(); show(library); try{window.Telegram?.WebApp?.HapticFeedback?.impactOccurred('medium')}catch{} }, 900);
     });
 
+    // — рендер библиотеки с безопасным триггером анимаций —
     function render(){
-      grid.innerHTML=subjects.map((s,i)=>`
-        <div class="tile" style="animation:fadeUp .4s ease ${i*40}ms forwards" onclick="alert('Открываем: ${s.title}')">
+      grid.innerHTML = subjects.map((s,i)=>`
+        <div class="tile" data-i="${i}">
           <div class="chip">${String(i+1).padStart(2,'0')}</div>
           <h3>${s.title}</h3>
           <p>${s.desc}</p>
         </div>`).join('');
+      // Плавный «въезд» — по кадрам
+      const tiles = Array.from(document.querySelectorAll('.tile'));
+      tiles.forEach((t,i)=> setTimeout(()=> t.classList.add('in'), i*60));
+      // клики
+      tiles.forEach(t=>{
+        t.addEventListener('click', (e)=>{ ripple(e); alert('Открываем: '+t.querySelector('h3').textContent); });
+      });
     }
+
+    // — параллакс фона при скролле —
+    library.addEventListener('scroll', ()=>{
+      const y = library.scrollTop;
+      bg.style.transform = `translateY(${y*-0.05}px)`;
+    }, {passive:true});
   </script>
 </body>
 </html>
