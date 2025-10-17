@@ -6,69 +6,74 @@ import json
 import asyncio
 import logging
 from pathlib import Path
-from typing import Any, Dict, Iterable, Optional
+from typing import Dict, Any, Iterable, Optional
 
 from dotenv import load_dotenv
 from aiogram import Bot, Dispatcher, F
 from aiogram.filters import CommandStart
 from aiogram.types import Message, ReplyKeyboardMarkup, KeyboardButton, WebAppInfo
 
-# OpenAI можно оставить для других фич; для логина не обязателен
-from openai import OpenAI  # noqa: F401
+from playwright.sync_api import (
+    sync_playwright,
+    TimeoutError as PWTimeout,
+    Page,
+    Frame,
+)
 
-# Playwright
-from playwright.sync_api import sync_playwright, TimeoutError as PWTimeout, Page, Frame
+# =========================
+# Конфиг и подготовка
+# =========================
 
 load_dotenv()
-BOT_TOKEN  = os.getenv("BOT_TOKEN", "").strip()
-WEBAPP_URL = os.getenv("WEBAPP_URL", "").strip()
-
+BOT_TOKEN  = (os.getenv("BOT_TOKEN") or "").strip()
+WEBAPP_URL = (os.getenv("WEBAPP_URL") or "").strip()  # https://<ты>.pages.dev?v=...
 if not BOT_TOKEN or not WEBAPP_URL:
-    raise RuntimeError("BOT_TOKEN/WEBAPP_URL не заданы")
+    raise RuntimeError("Задай BOT_TOKEN и WEBAPP_URL в .env")
 
-logging.basicConfig(level=logging.INFO, format="%(asctime)s | %(levelname)s | %(message)s")
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s | %(levelname)s | %(name)s | %(message)s"
+)
 log = logging.getLogger("miniapp")
+
 dp = Dispatcher()
 
-# ====== МАПА ЛМС-логинов по вузам (впиши свои реальные URL) ======
-LMS_URLS: Dict[str, str] = {
-    "ВШЭ — Национальный исследовательский университет": "https://lms.hse.ru/",   # пример
-    "МГУ им. М. В. Ломоносова":                        "https://lms.msu.ru/",    # пример
-    "СПбГУ":                                           "https://lms.spbu.ru/",
-    "МГИМО":                                           "https://lms.mgimo.ru/",
-    "Бауманка (МГТУ им. Баумана)":                     "https://lms.bmstu.ru/",
-    "ИТМО":                                            "https://lms.itmo.ru/",
-    "Физтех (МФТИ)":                                   "https://lms.mipt.ru/",
-    "НИТУ МИСИС":                                      "https://lms.misis.ru/",
-    "НГУ":                                             "https://lms.nsu.ru/",
-    "УРФУ":                                            "https://lms.urfu.ru/",
-}
-# Если по выбранному вузу нет URL — можно кинуть на какую-то форму/стаб:
-DEFAULT_LMS_URL = "https://example.com/login"  # подменишь
-
-# Простое локальное хранилище (демка). В проде — шифровать!
+# локальная демо-база (если захочешь хранить выбор вуза/логин)
 DB_PATH = Path("storage.json")
+
+
 def load_db() -> Dict[str, Any]:
     if DB_PATH.exists():
-        return json.load(open(DB_PATH, "r", encoding="utf-8"))
+        try:
+            return json.load(open(DB_PATH, "r", encoding="utf-8"))
+        except Exception:
+            return {}
     return {}
+
+
 def save_db(data: Dict[str, Any]) -> None:
     json.dump(data, open(DB_PATH, "w", encoding="utf-8"), ensure_ascii=False, indent=2)
 
-def miniapp_kb() -> ReplyKeyboardMarkup:
+
+def kb() -> ReplyKeyboardMarkup:
     return ReplyKeyboardMarkup(
         keyboard=[[KeyboardButton(text="Открыть мини-аппу", web_app=WebAppInfo(url=WEBAPP_URL))]],
         resize_keyboard=True,
         is_persistent=True,
     )
 
+# =========================
+# Хэндлеры бота
+# =========================
+
 @dp.message(CommandStart())
-async def on_start(m: Message):
+async def cmd_start(m: Message):
     await m.answer(
-        "Жми «Открыть мини-аппу» → кнопка «Тест» → выбери вуз → введи логин/пароль. "
-        "Я открою браузер и залогинюсь в ЛМС.",
-        reply_markup=miniapp_kb()
+        "Бро, жми «Открыть мини-аппу». Внизу кнопка «Тест» → выбери вуз → введи логин/пароль. "
+        "Я открою видимый браузер и вставлю их в онлайн-блокнот.",
+        reply_markup=kb(),
     )
+
 
 @dp.message(F.web_app_data)
 async def on_web_app_data(m: Message):
@@ -76,25 +81,29 @@ async def on_web_app_data(m: Message):
     try:
         data = json.loads(raw)
     except Exception:
-        await m.answer("Не смог распарсить данные из мини-аппы 🤷‍♂️")
+        await m.answer("Не смог распарсить JSON из мини-аппы 🤷‍♂️")
         return
 
     kind = (data.get("kind") or "").strip()
-    if kind == "login_lms" or kind == "run_test":  # поддержим старое имя 'run_test'
-        await handle_login_lms(m, data)
+    if kind == "paste_to_notepad":
+        await handle_paste_to_notepad(m, data)
     else:
-        await m.answer("Неизвестная операция. Обнови мини-аппу и попробуй ещё раз.")
+        await m.answer(f"Неизвестная операция: {kind}. Обнови мини-аппу.")
 
-# ----------------- Playwright helpers -----------------
 
-def _iter_contexts(page: Page) -> Iterable[Frame]:
-    """Возвращает все фреймы: сначала сам page.main_frame, потом вложенные."""
+# =========================
+# Playwright утилиты
+# =========================
+
+def _iter_frames(page: Page) -> Iterable[Frame]:
+    # основной фрейм + все вложенные
     yield page.main_frame
     for fr in page.frames:
         yield fr
 
+
 def _first_visible(fr: Frame, selectors: Iterable[str], timeout: int = 4000):
-    """Ищем первый видимый элемент по списку селекторов (в заданном фрейме)."""
+    # первый видимый элемент по списку селекторов
     for sel in selectors:
         loc = fr.locator(sel)
         try:
@@ -104,137 +113,110 @@ def _first_visible(fr: Frame, selectors: Iterable[str], timeout: int = 4000):
             continue
     return None
 
-def playwright_login_flow(url: str, login: str, password: str, keep_open: bool = True) -> str:
+
+def open_notepad_and_type(login_text: str, password_text: str) -> str:
     """
-    Открывает браузер (НЕ headless), ждёт реальную загрузку, заполняет логин/пароль,
-    кликает кнопку Войти. Пытается детектить успех. Возвращает текстовый результат.
+    Открывает https://notepadonline.ru/app в ВИДИМОМ браузере (headless=False),
+    ждёт реальную загрузку (domcontentloaded + попытка networkidle),
+    ищет редактируемую область и печатает:
+        <login_text>\n<password_text>
+    Браузер НЕ закрываем.
+    Возвращает текстовый статус.
     """
+    url = "https://notepadonline.ru/app"
+
     with sync_playwright() as p:
-        # видимый браузер, без искусственных задержек
-        browser = p.chromium.launch(headless=False)
+        # Видимый браузер, без искусственных sleep
+        browser = p.chromium.launch(headless=False)  # окно будет видно
         context = browser.new_context()
         page = context.new_page()
 
-        # Ждём реальную загрузку: domcontentloaded + networkidle
-        page.goto(url, wait_until="domcontentloaded", timeout=60000)
+        # Переход + реальные состояния загрузки
+        page.goto(url, wait_until="domcontentloaded", timeout=60_000)
         try:
-            page.wait_for_load_state("networkidle", timeout=15000)
+            page.wait_for_load_state("networkidle", timeout=15_000)
         except PWTimeout:
-            # Ок, если сайты постоянно подтягивают данных — идём дальше по селекторам
+            # Окей, если сайт постоянно дёргает сеть — двигаемся дальше по селекторам
             pass
 
-        # Ищем поля логина/пароля в основном фрейме и во вложенных
-        login_selectors = [
-            'input[name="login"]',
-            'input[name="username"]',
-            'input[id*="user"]',
-            'input[type="email"]',
-            'input[type="text"]',
-        ]
-        pass_selectors = [
-            'input[name="password"]',
-            'input[id*="pass"]',
-            'input[type="password"]',
-        ]
-        submit_selectors = [
-            'button:has-text("Войти")',
-            'button[type="submit"]',
-            'input[type="submit"]',
-            'button:has-text("Log in")',
-            'button:has-text("Sign in")',
+        # Попробуем нажать «Создать новую запись», если есть
+        try:
+            page.get_by_role("button", name=lambda n: n and ("Создать" in n or "Новая" in n)).click(timeout=3_000)
+        except Exception:
+            pass
+
+        # Ищем редактируемую область
+        editor = None
+        editor_selectors = [
+            '[contenteditable="true"]',
+            'div[role="textbox"]',
+            '.notepad, .editor, .ql-editor, .monaco-editor',
+            'textarea',
         ]
 
-        login_el = None
-        pass_el  = None
-        submit_el= None
-        used_frame: Optional[Frame] = None
-
-        # Перебираем фреймы
-        for fr in _iter_contexts(page):
-            if not login_el:
-                login_el = _first_visible(fr, login_selectors)
-            if not pass_el:
-                pass_el  = _first_visible(fr, pass_selectors)
-            if not submit_el:
-                submit_el = _first_visible(fr, submit_selectors)
-            if login_el and pass_el:
-                used_frame = fr
+        for fr in _iter_frames(page):
+            editor = _first_visible(fr, editor_selectors, timeout=5_000)
+            if editor:
                 break
 
-        if not (login_el and pass_el):
-            return "Не нашёл поля логина/пароля. Проверь URL ЛМС или селекторы."
+        text_to_type = f"{login_text}\n{password_text}"
 
-        # Заполняем
-        login_el.click()
-        login_el.fill(login)
-        pass_el.click()
-        pass_el.fill(password)
-
-        # Нажимаем Войти
-        if submit_el:
-            submit_el.click()
+        if editor:
+            editor.click()
+            editor.type(text_to_type, delay=8)  # печатаем посимвольно, видно глазами
         else:
-            # иногда Enter в поле пароля срабатывает
-            pass_el.press("Enter")
+            # fallback: клик в центр страницы и печать «в никуда» — многие редакторы всё равно ловят ввод
+            page.click("body", position={"x": 420, "y": 300})
+            page.keyboard.type(text_to_type, delay=8)
 
-        # Ждём смену состояния: networkidle / смену URL / пропажу формы
-        success = False
+        # Снимок на память, рядом с miniapp.py
         try:
-            page.wait_for_load_state("networkidle", timeout=15000)
-        except PWTimeout:
+            page.screenshot(path="notepad_filled.png", full_page=True)
+        except Exception:
             pass
 
-        # эвристики успеха: нет полей логина/пароля видимых, есть меню/аватар/выход и т.п.
-        try:
-            # если логин/пароль снова видимы — вероятно не пустило
-            if used_frame:
-                still_login = _first_visible(used_frame, login_selectors, timeout=2000)
-                still_pass  = _first_visible(used_frame, pass_selectors, timeout=2000)
-                success = not (still_login and still_pass)
-            else:
-                success = True
-        except Exception:
-            success = True
+        # БРАУЗЕР НЕ ЗАКРЫВАЕМ
+        return "Готово ✅ Логин и пароль вставлены в блокнот. Браузер оставил открытым."
 
-        # Браузер **НЕ закрываем**, чтобы ты видел, что произошло
-        # if not keep_open:
-        #     browser.close()
 
-        return "Логин успешен ✅" if success else "Не получилось залогиниться ❌ (проверь логин/пароль/2FA)"
+# =========================
+# Хэндлер логики вставки
+# =========================
 
-# ----------------- Handler -----------------
-
-async def handle_login_lms(m: Message, data: Dict[str, Any]):
-    user_id = str(m.from_user.id)
+async def handle_paste_to_notepad(m: Message, data: Dict[str, Any]):
     uni = (data.get("uni") or "").strip()
     login = (data.get("login") or "").strip()
     password = (data.get("password") or "").strip()
 
     if not (uni and login and password):
-        await m.answer("Заполни вуз + логин + пароль в мини-аппе.")
+        await m.answer("Нужно выбрать вуз и ввести логин и пароль.")
         return
 
-    url = LMS_URLS.get(uni) or DEFAULT_LMS_URL
-
-    # Сохраним (демо; в проде — шифруй!)
+    # По желанию — сохраним (ДЕМО! В проде шифруй!)
     db = load_db()
-    db[user_id] = {"uni": uni, "login": login, "password": password, "url": url}
+    db[str(m.from_user.id)] = {"uni": uni, "login": login, "password": password}
     save_db(db)
 
-    await m.answer(f"Открываю браузер и логинюсь в ЛМС *{uni}*…", parse_mode="Markdown")
+    await m.answer(f"Открываю блокнот и вставляю данные…\nВуз: *{uni}*", parse_mode="Markdown")
 
     def _run():
-        return playwright_login_flow(url, login, password, keep_open=True)
+        return open_notepad_and_type(login, password)
 
     try:
         result = await asyncio.to_thread(_run)
         await m.answer(result)
     except Exception as e:
-        logging.exception("Playwright login error")
-        await m.answer(f"Не смог автоматизировать логин: {e}")
+        log.exception("Playwright error")
+        await m.answer(f"Playwright упал: {e}")
+
+
+# =========================
+# Точка входа
+# =========================
 
 async def main():
     bot = Bot(BOT_TOKEN)
+    log.info("Bot online. WEBAPP_URL=%s", WEBAPP_URL)
     await dp.start_polling(bot)
 
 if __name__ == "__main__":
